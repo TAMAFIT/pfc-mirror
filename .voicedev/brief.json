@@ -1,0 +1,4 @@
+{
+  "title": "たまフィットPFC Mirror",
+  "brief": "TAMAFIT/pfc の最新mainをソースの正本として忠実に複製する検証用ミラー。元のTAMAFIT/pfcは一切変更しない。複製後は機能ロジック・保存・API/GAS連携・PWA挙動を維持したまま、識別用としてピンク系テーマを緑系へ変更し、PWAアイコンも緑系に変更する。GitHub Pagesで公開し、Android端末へPWAインストールして実機検証する。"
+}
