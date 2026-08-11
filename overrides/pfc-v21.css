@@ -204,3 +204,19 @@
   color: #819087;
   font-size: 11px;
 }
+
+/* Quick-input swipe fix: avoid a nested scroll trap on mobile.
+   The expanded card grid grows with the page, so vertical swipes can start on any card. */
+.pfc-v21 #manual-inp-sec.quick-favorite-mode #f-list {
+  max-height: none !important;
+  overflow-y: visible !important;
+  overflow-x: visible !important;
+  overscroll-behavior: auto !important;
+  -webkit-overflow-scrolling: auto !important;
+  touch-action: pan-y !important;
+}
+.pfc-v21 #manual-inp-sec.quick-favorite-mode .favorite-quick-row,
+.pfc-v21 #manual-inp-sec.quick-favorite-mode .favorite-chip-main,
+.pfc-v21 #manual-inp-sec.quick-favorite-mode .quick-card-edit {
+  touch-action: pan-y !important;
+}
