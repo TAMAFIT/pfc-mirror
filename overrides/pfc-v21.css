@@ -1,0 +1,206 @@
+/* PFC Mirror V2.1: voice UI + manual search polish */
+:root.pfc-v21 {
+  --pfc-green: #22a06b;
+  --pfc-green-dark: #187a51;
+  --pfc-green-light: #dff5e9;
+  --pfc-green-soft: #effaf4;
+}
+
+/* Main voice CTA: remove the remaining pink block from the green mirror. */
+.pfc-v21 .btn-voice-main {
+  background: linear-gradient(135deg, #1f9d68 0%, #37bd80 100%) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,.28) !important;
+  box-shadow: 0 12px 26px rgba(34,160,107,.28), inset 0 1px 0 rgba(255,255,255,.28) !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.12) !important;
+}
+.pfc-v21 .btn-voice-main:active {
+  transform: translateY(1px) scale(.992);
+  box-shadow: 0 6px 14px rgba(34,160,107,.24) !important;
+}
+
+/* Voice sheet */
+.pfc-v21 #voice-ui-window {
+  background: #f8fcfa !important;
+  border-radius: 26px 26px 0 0 !important;
+  box-shadow: 0 -18px 50px rgba(17,79,55,.18) !important;
+}
+.pfc-v21 #voice-ui-window .v-header {
+  background: linear-gradient(135deg, #187a51 0%, #22a06b 58%, #45bf86 100%) !important;
+  color: #fff !important;
+  border-bottom: 0 !important;
+}
+.pfc-v21 #voice-ui-window .v-title {
+  color: #fff !important;
+  font-weight: 900 !important;
+  letter-spacing: .01em;
+}
+.pfc-v21 #voice-ui-window .v-close {
+  color: #fff !important;
+  background: rgba(255,255,255,.16) !important;
+  border: 1px solid rgba(255,255,255,.22) !important;
+}
+.pfc-v21 #voice-ui-window .v-body {
+  background: linear-gradient(180deg, #edf9f3 0%, #ffffff 100%) !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid #dcefe5 !important;
+}
+.pfc-v21 #voice-ui-window .v-status {
+  color: #187a51 !important;
+  font-weight: 900 !important;
+}
+.pfc-v21 #voice-ui-window .v-auto-send {
+  background: #fff !important;
+  border: 1px solid #d3eadf !important;
+  box-shadow: 0 7px 18px rgba(34,160,107,.09) !important;
+}
+.pfc-v21 #voice-ui-window .v-auto-state,
+.pfc-v21 #voice-ui-window .v-auto-text {
+  color: #187a51 !important;
+}
+.pfc-v21 #voice-ui-window .v-auto-switch {
+  background: #d9e9e1 !important;
+}
+.pfc-v21 #voice-ui-window input:checked + .v-auto-state + .v-auto-switch,
+.pfc-v21 #voice-ui-window input:checked ~ .v-auto-switch {
+  background: #22a06b !important;
+}
+.pfc-v21 #voice-ui-window .v-mic-btn {
+  background: linear-gradient(145deg, #f7fcf9 0%, #e3f2ea 100%) !important;
+  border: 2px solid #bfe3d1 !important;
+  box-shadow: 0 9px 22px rgba(34,160,107,.16), inset 0 2px 5px rgba(255,255,255,.9) !important;
+}
+.pfc-v21 #voice-ui-window .v-mic-btn.listening {
+  background: linear-gradient(145deg, #22a06b 0%, #45c68a 100%) !important;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 8px rgba(34,160,107,.12), 0 14px 32px rgba(34,160,107,.34) !important;
+}
+.pfc-v21 #voice-ui-window .v-send-now,
+.pfc-v21 #voice-ui-window button[id*="send"] {
+  background: linear-gradient(135deg, #1f9d68, #35b97d) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 8px 18px rgba(34,160,107,.20) !important;
+}
+.pfc-v21 #voice-ui-window #v-chat-input {
+  border: 1px solid #cfe8dc !important;
+  background: #fff !important;
+  color: #183629 !important;
+}
+.pfc-v21 #voice-ui-window #v-chat-input:focus {
+  border-color: #22a06b !important;
+  box-shadow: 0 0 0 3px rgba(34,160,107,.11) !important;
+  outline: none !important;
+}
+.pfc-v21 #voice-ui-window .msg.bot .text {
+  border-color: #d8eee3 !important;
+  background: #f4fbf7 !important;
+}
+
+/* Manual search */
+.pfc-v21 #manual-inp-sec .s-box {
+  position: relative;
+}
+.pfc-v21 #manual-inp-sec .s-inp {
+  padding-right: 46px !important;
+  border: 1px solid #d8e6df !important;
+  background: #fff !important;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.pfc-v21 #manual-inp-sec .s-inp:focus {
+  border-color: #22a06b !important;
+  box-shadow: 0 0 0 3px rgba(34,160,107,.10) !important;
+  outline: none !important;
+}
+.pfc-search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%) scale(.9);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: #e8f2ed;
+  color: #5d7569;
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+  z-index: 4;
+}
+.pfc-search-clear.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+.pfc-v21 #s-res {
+  border: 1px solid #d9eae1 !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 14px 30px rgba(22,82,58,.12) !important;
+  background: #fff !important;
+  max-height: min(52vh, 430px);
+  overflow-y: auto;
+}
+.pfc-v21 #s-res .pfc-search-result {
+  width: 100%;
+  border: 0 !important;
+  border-bottom: 1px solid #edf3f0 !important;
+  background: #fff !important;
+  color: #1d2b25 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px !important;
+  text-align: left;
+  cursor: pointer;
+}
+.pfc-v21 #s-res .pfc-search-result:last-child {
+  border-bottom: 0 !important;
+}
+.pfc-v21 #s-res .pfc-search-result:active {
+  background: #eff9f4 !important;
+}
+.pfc-search-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pfc-search-main strong {
+  font-size: 14px;
+  line-height: 1.35;
+  color: #172820;
+}
+.pfc-search-main small {
+  font-size: 10.5px;
+  color: #73867d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfc-search-arrow {
+  flex: 0 0 auto;
+  color: #22a06b;
+  font-size: 25px;
+  font-weight: 400;
+}
+.pfc-v21 #s-res .pfc-search-empty {
+  display: flex !important;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px !important;
+  background: #f8fbf9 !important;
+  color: #43584e !important;
+  cursor: default !important;
+}
+.pfc-v21 #s-res .pfc-search-empty small {
+  color: #819087;
+  font-size: 11px;
+}

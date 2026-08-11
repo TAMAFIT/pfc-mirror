@@ -41,7 +41,7 @@ jobs:
       - name: Build isolated green mirror
         run: node scripts/build-mirror.mjs
 
-      - name: Apply Obayashi trainer AI avatar
+      - name: Apply trainer AI and PFC V2.1 overlay
         run: node scripts/apply-trainer-avatar.mjs
 
       - name: Validate mirror safety and PWA essentials
@@ -54,6 +54,9 @@ jobs:
           test -f dist/mirror-storage.js
           test -f dist/tamachan-data.js
           test -f dist/trainer-ai-avatar.webp
+          test -f dist/pfc-v21.js
+          test -f dist/pfc-v21-search-fix.js
+          test -f dist/pfc-v21.css
           test ! -e dist/gas
           test ! -e dist/.github
           test ! -e dist/.voicedev
@@ -61,6 +64,8 @@ jobs:
           node --check dist/mirror-storage.js
           node --check dist/tamachan-data.js
           node --check dist/ai.js
+          node --check dist/pfc-v21.js
+          node --check dist/pfc-v21-search-fix.js
           grep -q 'PFC Mirror' dist/manifest.json
           grep -q '#22a06b' dist/manifest.json
           grep -q 'pfc-mirror:v1:' dist/mirror-storage.js
@@ -71,6 +76,15 @@ jobs:
           grep -q 'trainer-ai-avatar.webp' dist/index.html
           grep -q '大林トレーナーAI' dist/index.html
           grep -q 'trainer-ai-avatar.webp' dist/ai.js
+          grep -q 'pfc-v21.js' dist/index.html
+          grep -q 'pfc-v21-search-fix.js' dist/index.html
+          grep -q 'pfc-v21.css' dist/index.html
+          grep -q '__PFC_SEARCH_V21__' dist/pfc-v21.js
+          grep -q "VERSION = '2.1.0'" dist/pfc-v21.js
+          grep -q '__PFC_SEARCH_V21_BROAD__' dist/pfc-v21-search-fix.js
+          grep -q "version: '2.1.1'" dist/pfc-v21-search-fix.js
+          grep -q '.btn-voice-main' dist/pfc-v21.css
+          grep -q '#voice-ui-window' dist/pfc-v21.css
           ! grep -q '🥚 たまちゃんコーチ' dist/index.html
 
   deploy:
@@ -107,7 +121,7 @@ jobs:
       - name: Build isolated green mirror
         run: node scripts/build-mirror.mjs
 
-      - name: Apply Obayashi trainer AI avatar
+      - name: Apply trainer AI and PFC V2.1 overlay
         run: node scripts/apply-trainer-avatar.mjs
 
       - name: Configure GitHub Pages
