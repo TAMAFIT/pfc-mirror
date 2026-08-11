@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.3.0';
+  const VERSION = '2.3.1';
   const RATE_LIMIT_URL = 'https://aistudio.google.com/rate-limit?timeRange=last-28-days';
   const MODEL_STORAGE_KEY = 'tf_ai_model_preference';
   const LEGACY_MODEL_IDS = {
@@ -48,13 +48,6 @@
       actions.className = 'model-picker-actions-v23';
       select.parentNode.insertBefore(actions, select);
       actions.appendChild(select);
-
-      const rateButton = document.createElement('button');
-      rateButton.type = 'button';
-      rateButton.className = 'model-rate-limit-btn-v23';
-      rateButton.textContent = '上限を見る';
-      rateButton.onclick = () => window.open(RATE_LIMIT_URL, '_blank', 'noopener,noreferrer');
-      actions.appendChild(rateButton);
     }
 
     let meta = row.querySelector('.model-picker-meta-v23');
@@ -66,6 +59,26 @@
     }
 
     return { row, actions, meta };
+  }
+
+  function ensureManagerRateLimitButton() {
+    const modal = document.getElementById('manager-modal');
+    const box = modal?.querySelector('.modal-box');
+    if (!box || box.querySelector('.manager-ai-limit-v23')) return;
+
+    const section = document.createElement('div');
+    section.className = 'manager-ai-limit-v23';
+    section.innerHTML = `
+      <div class="manager-ai-limit-title-v23">AI API 管理</div>
+      <div class="manager-ai-limit-note-v23">Google AI Studioで、このプロジェクトのRPM / TPM / RPDを確認します。</div>
+      <button type="button" class="manager-ai-limit-btn-v23">AI StudioのRate Limitを開く</button>
+    `;
+    const button = section.querySelector('.manager-ai-limit-btn-v23');
+    button.onclick = () => window.open(RATE_LIMIT_URL, '_blank', 'noopener,noreferrer');
+
+    const heading = box.querySelector('h3');
+    if (heading?.nextSibling) box.insertBefore(section, heading.nextSibling);
+    else box.prepend(section);
   }
 
   async function fetchAvailableModels() {
@@ -140,6 +153,7 @@
     const select = document.getElementById('ai-model-select');
     if (!select) return;
     const ui = ensureModelPickerUi(select);
+    ensureManagerRateLimitButton();
 
     select.disabled = true;
     select.innerHTML = '<option>利用可能モデルを取得中...</option>';
@@ -159,6 +173,7 @@
     version: VERSION,
     source: 'models.list',
     selection: 'manual',
+    rateLimitLocation: 'manager-mode',
     rateLimitUrl: RATE_LIMIT_URL,
     refresh: initDynamicModelSelector
   };
