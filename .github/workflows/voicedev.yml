@@ -41,6 +41,9 @@ jobs:
       - name: Build isolated green mirror
         run: node scripts/build-mirror.mjs
 
+      - name: Apply Obayashi trainer AI avatar
+        run: node scripts/apply-trainer-avatar.mjs
+
       - name: Validate mirror safety and PWA essentials
         shell: bash
         run: |
@@ -50,12 +53,14 @@ jobs:
           test -f dist/icon-mirror.svg
           test -f dist/mirror-storage.js
           test -f dist/tamachan-data.js
+          test -f dist/trainer-ai-avatar.webp
           test ! -e dist/gas
           test ! -e dist/.github
           test ! -e dist/.voicedev
           node --check dist/sw.js
           node --check dist/mirror-storage.js
           node --check dist/tamachan-data.js
+          node --check dist/ai.js
           grep -q 'PFC Mirror' dist/manifest.json
           grep -q '#22a06b' dist/manifest.json
           grep -q 'pfc-mirror:v1:' dist/mirror-storage.js
@@ -63,6 +68,10 @@ jobs:
           grep -q '大林トレーナーAI' dist/tamachan-data.js
           grep -q 'tryHandleLocalSkinCorrection' dist/tamachan-data.js
           grep -q "version: '2.0.1'" dist/tamachan-data.js
+          grep -q 'trainer-ai-avatar.webp' dist/index.html
+          grep -q '大林トレーナーAI' dist/index.html
+          grep -q 'trainer-ai-avatar.webp' dist/ai.js
+          ! grep -q '🥚 たまちゃんコーチ' dist/index.html
 
   deploy:
     if: needs.validate.outputs.publish_ready == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -97,6 +106,9 @@ jobs:
 
       - name: Build isolated green mirror
         run: node scripts/build-mirror.mjs
+
+      - name: Apply Obayashi trainer AI avatar
+        run: node scripts/apply-trainer-avatar.mjs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
