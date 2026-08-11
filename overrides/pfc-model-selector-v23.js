@@ -68,10 +68,11 @@
 
     const section = document.createElement('div');
     section.className = 'manager-ai-limit-v23';
+    section.style.cssText = 'margin:14px 0 18px;padding:14px;border:1px solid #cfe7dd;border-radius:12px;background:#f4fbf8;';
     section.innerHTML = `
-      <div class="manager-ai-limit-title-v23">AI API 管理</div>
-      <div class="manager-ai-limit-note-v23">Google AI Studioで、このプロジェクトのRPM / TPM / RPDを確認します。</div>
-      <button type="button" class="manager-ai-limit-btn-v23">AI StudioのRate Limitを開く</button>
+      <div class="manager-ai-limit-title-v23" style="font-size:13px;font-weight:900;color:#176c51;margin-bottom:5px;">AI API 管理</div>
+      <div class="manager-ai-limit-note-v23" style="font-size:11px;line-height:1.5;color:#60756d;margin-bottom:10px;">Google AI Studioで、このプロジェクトのRPM / TPM / RPDを確認します。</div>
+      <button type="button" class="manager-ai-limit-btn-v23" style="width:100%;border:0;border-radius:9px;padding:10px 12px;background:#22a06b;color:#fff;font-size:12px;font-weight:900;cursor:pointer;">AI StudioのRate Limitを開く</button>
     `;
     const button = section.querySelector('.manager-ai-limit-btn-v23');
     button.onclick = () => window.open(RATE_LIMIT_URL, '_blank', 'noopener,noreferrer');
@@ -169,6 +170,7 @@
 
   document.addEventListener('DOMContentLoaded', initDynamicModelSelector);
 
+  // 旧「上限を見る」ボタンは一般設定画面には表示せず、Manager Modeのみに配置する。
   window.__PFC_MODEL_SELECTOR_V23__ = {
     version: VERSION,
     source: 'models.list',
