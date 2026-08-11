@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TAMAFIT/pfc
-          ref: 011a42263b022353e4ddb1444ceaef7c31209e3c
+          ref: 1c0a84f044d520c009384eeb1e7a96212e12d6b3
           path: _source_pfc
           persist-credentials: false
 
@@ -61,6 +61,8 @@ jobs:
           grep -q 'pfc-mirror:v1:' dist/mirror-storage.js
           grep -q '__PFC_AI_V2__' dist/tamachan-data.js
           grep -q '大林トレーナーAI' dist/tamachan-data.js
+          grep -q 'tryHandleLocalSkinCorrection' dist/tamachan-data.js
+          grep -q "version: '2.0.1'" dist/tamachan-data.js
 
   deploy:
     if: needs.validate.outputs.publish_ready == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -84,7 +86,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TAMAFIT/pfc
-          ref: 011a42263b022353e4ddb1444ceaef7c31209e3c
+          ref: 1c0a84f044d520c009384eeb1e7a96212e12d6b3
           path: _source_pfc
           persist-credentials: false
 
