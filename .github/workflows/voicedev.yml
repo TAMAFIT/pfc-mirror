@@ -41,7 +41,7 @@ jobs:
       - name: Build isolated green mirror
         run: node scripts/build-mirror.mjs
 
-      - name: Apply trainer AI and PFC V2.1 overlay
+      - name: Apply trainer AI and mirror overlays
         run: node scripts/apply-trainer-avatar.mjs
 
       - name: Validate mirror safety and PWA essentials
@@ -57,6 +57,7 @@ jobs:
           test -f dist/pfc-v21.js
           test -f dist/pfc-v21-search-fix.js
           test -f dist/pfc-v21.css
+          test -f dist/pfc-dummy-v22.js
           test ! -e dist/gas
           test ! -e dist/.github
           test ! -e dist/.voicedev
@@ -66,6 +67,7 @@ jobs:
           node --check dist/ai.js
           node --check dist/pfc-v21.js
           node --check dist/pfc-v21-search-fix.js
+          node --check dist/pfc-dummy-v22.js
           grep -q 'PFC Mirror' dist/manifest.json
           grep -q '#22a06b' dist/manifest.json
           grep -q 'pfc-mirror:v1:' dist/mirror-storage.js
@@ -79,10 +81,14 @@ jobs:
           grep -q 'pfc-v21.js' dist/index.html
           grep -q 'pfc-v21-search-fix.js' dist/index.html
           grep -q 'pfc-v21.css' dist/index.html
+          grep -q 'pfc-dummy-v22.js' dist/index.html
           grep -q '__PFC_SEARCH_V21__' dist/pfc-v21.js
           grep -q "VERSION = '2.1.0'" dist/pfc-v21.js
           grep -q '__PFC_SEARCH_V21_BROAD__' dist/pfc-v21-search-fix.js
           grep -q "version: '2.1.1'" dist/pfc-v21-search-fix.js
+          grep -q '__PFC_DUMMY_V22__' dist/pfc-dummy-v22.js
+          grep -q "VERSION = '2.2.0'" dist/pfc-dummy-v22.js
+          grep -q 'realistic-simulation' dist/pfc-dummy-v22.js
           grep -q '.btn-voice-main' dist/pfc-v21.css
           grep -q '#voice-ui-window' dist/pfc-v21.css
           ! grep -q '🥚 たまちゃんコーチ' dist/index.html
@@ -121,7 +127,7 @@ jobs:
       - name: Build isolated green mirror
         run: node scripts/build-mirror.mjs
 
-      - name: Apply trainer AI and PFC V2.1 overlay
+      - name: Apply trainer AI and mirror overlays
         run: node scripts/apply-trainer-avatar.mjs
 
       - name: Configure GitHub Pages
