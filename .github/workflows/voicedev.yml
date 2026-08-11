@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TAMAFIT/pfc
-          ref: ccf48abdb186a6bb79249abf06ffb5e539758301
+          ref: 011a42263b022353e4ddb1444ceaef7c31209e3c
           path: _source_pfc
           persist-credentials: false
 
@@ -49,14 +49,18 @@ jobs:
           test -f dist/sw.js
           test -f dist/icon-mirror.svg
           test -f dist/mirror-storage.js
+          test -f dist/tamachan-data.js
           test ! -e dist/gas
           test ! -e dist/.github
           test ! -e dist/.voicedev
           node --check dist/sw.js
           node --check dist/mirror-storage.js
+          node --check dist/tamachan-data.js
           grep -q 'PFC Mirror' dist/manifest.json
           grep -q '#22a06b' dist/manifest.json
           grep -q 'pfc-mirror:v1:' dist/mirror-storage.js
+          grep -q '__PFC_AI_V2__' dist/tamachan-data.js
+          grep -q '大林トレーナーAI' dist/tamachan-data.js
 
   deploy:
     if: needs.validate.outputs.publish_ready == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -80,7 +84,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TAMAFIT/pfc
-          ref: ccf48abdb186a6bb79249abf06ffb5e539758301
+          ref: 011a42263b022353e4ddb1444ceaef7c31209e3c
           path: _source_pfc
           persist-credentials: false
 
