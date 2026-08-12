@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const corePath = process.argv[2] || 'overrides/pfc-database-v3.js';
 const catalogPath = process.argv[3] || 'overrides/pfc-database-v3-catalog.js';
@@ -58,7 +60,7 @@ vm.runInContext(catalog, context, { filename: catalogPath });
 const api = context.__PFC_DB_V3__;
 const c = context.__PFC_DB_V3_CATALOG__;
 assert.ok(api && c);
-assert.equal(c.version, '3.1.0');
+assert.equal(c.version, '3.1.1');
 
 assert.equal(api.get(0).input.defaultUnit, '食');
 assert.equal(api.get(0).input.type, 'portion');
@@ -91,3 +93,10 @@ assert.deepEqual(Array.from(eggRef.grossWeightRanges.M), [58,64]);
 assert.match(eggRef.note, /可食部gへの自動換算には使わない/);
 
 console.log('Database V3 natural-unit catalog tests passed.');
+
+// The normal CI already invokes this catalog test, so chain the verified-food suite here.
+const verifiedPath = path.join(path.dirname(corePath), 'pfc-database-v3-verified.js');
+if (!fs.existsSync(verifiedPath)) throw new Error(`Verified DB V3 layer missing: ${verifiedPath}`);
+const verifiedTest = path.join(process.cwd(), 'scripts', 'test-database-v3-verified.mjs');
+const child = spawnSync(process.execPath, [verifiedTest, verifiedPath, corePath, catalogPath], { stdio: 'inherit' });
+if (child.status !== 0) throw new Error('Database V3 verified-food test suite failed');
