@@ -26,12 +26,18 @@ def safe_name_score(item, official_name):
     return _base_name_score(item,text)
 core.name_score=safe_name_score
 
-# Candidate confidence and source promotion are separate gates. A candidate can
-# be high-confidence but must also be in current nutrition parity before it is
-# safe to auto-promote without changing food values.
+# Candidate confidence and source promotion are separate gates. Also restrict
+# known app categories to the corresponding official MEXT food groups before
+# scoring; this is both faster and prevents cross-category nutrition lookalikes.
 _base_classify=core.classify_item
 def safe_classify(item, rows):
-    result=_base_classify(item,rows)
+    if item.get('category') in core.MEXT_UNLIKELY:
+        return {'status':'mext-unlikely','autoPromotable':False,'candidates':[]}
+    allowed=core.CATEGORY_GROUPS.get(item.get('category'))
+    scoped=rows
+    if allowed:
+        scoped={item_no:row for item_no,row in rows.items() if str(item_no)[:2] in allowed}
+    result=_base_classify(item,scoped)
     result['autoPromotable']=bool(result.get('status')=='high' and result.get('nutritionInParity') is True)
     return result
 core.classify_item=safe_classify
