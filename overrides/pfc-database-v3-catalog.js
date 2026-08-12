@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.1.0';
+  const VERSION = '3.1.1';
   const BUNDLE_MIGRATION_MARKER = 'pfc-db-v3-bundle-units-310';
 
   // These are semantic/unit corrections only. Nutrition values remain untouched.
@@ -110,6 +110,19 @@
     });
   }
 
+  function applyVerifiedSources() {
+    const hints = window.__PFC_DB_V3_VERIFIED_SOURCES__ || {};
+    Object.entries(hints).forEach(([name, hint]) => {
+      findByName(name).forEach(meta => {
+        meta.source = { ...hint.source };
+        meta.servingSource = { ...hint.serving };
+        meta.confidence = hint.confidence || 'high';
+        meta.verifiedVersion = hint.verifiedVersion;
+        meta.unitConfidence = hint.serving?.exactForEntry === true ? 'high' : meta.unitConfidence;
+      });
+    });
+  }
+
   function applyNaturalUnits() {
     const api = window.__PFC_DB_V3__;
     if (!api?.items) return;
@@ -136,6 +149,7 @@
     migrateBundleFavoriteSettings();
     applyBundleCountBases();
     applyNaturalUnits();
+    applyVerifiedSources();
 
     window.__PFC_DB_V3_CATALOG__ = {
       version: VERSION,
@@ -143,6 +157,7 @@
       bundleCountFoods: Object.keys(BUNDLE_COUNT_BASES),
       mealServingFoods: [...MEAL_AS_ONE_SERVING],
       packageOverrides: { ...PACKAGE_OVERRIDES },
+      verifiedSourcesApplied: Object.keys(window.__PFC_DB_V3_VERIFIED_SOURCES__ || {}).length,
       sources: {
         maffRiceServingGuide: RICE_SERVING_REFERENCE.url,
         maffEggStandard: EGG_SIZE_REFERENCE.url
