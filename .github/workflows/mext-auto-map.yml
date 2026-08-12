@@ -6,6 +6,7 @@ on:
       - 'overrides/pfc-database-v3*.js'
       - 'scripts/export-effective-food-master.mjs'
       - 'scripts/mext-map-food-master.py'
+      - 'scripts/mext-map-food-master-fast.py'
       - 'scripts/test-mext-map-food-master.py'
       - 'scripts/mext-reconcile*.py'
       - '.github/workflows/mext-auto-map.yml'
@@ -57,7 +58,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/mext-map-food-master.py \
+          python scripts/mext-map-food-master-fast.py \
             --food-master food-master-effective.json \
             --out-json mext-food-master-map.json \
             --out-md mext-food-master-map.md
