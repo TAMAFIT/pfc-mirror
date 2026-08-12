@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
 const dist = path.join(root, 'dist');
@@ -99,4 +100,9 @@ if (!finalHtml.includes('pfc-database-v3-verified-b5.js?v=350')) throw new Error
 if (!finalHtml.includes('pfc-database-v3-multiunit.js?v=360')) throw new Error('Database V3 multi-unit cache version is stale.');
 if (!finalHtml.includes('pfc-database-v3-search.js?v=370')) throw new Error('Database V3 search cache version is stale.');
 
-console.log('Database V3 verified foods B1-B5 + natural-unit catalog + multi-unit engine + canonical search applied.');
+const runtimeApply = path.join(root, 'scripts', 'apply-food-master-runtime.mjs');
+if (!fs.existsSync(runtimeApply)) throw new Error(`Food Master runtime apply script missing: ${runtimeApply}`);
+const runtimeResult = spawnSync(process.execPath, [runtimeApply], { stdio: 'inherit' });
+if (runtimeResult.status !== 0) throw new Error('Food Master runtime build step failed');
+
+console.log('Database V3 verified foods B1-B5 + natural-unit catalog + multi-unit engine + canonical search + Food Master runtime applied.');
