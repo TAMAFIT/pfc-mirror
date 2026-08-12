@@ -7,6 +7,7 @@ const overlays = [
   'overrides/pfc-v21.js',
   'overrides/pfc-database-v3-verified.js',
   'overrides/pfc-database-v3-verified-b5.js',
+  'overrides/pfc-database-v3-mext-promoted.js',
   'overrides/pfc-database-v3.js',
   'overrides/pfc-database-v3-catalog.js',
   'overrides/pfc-database-v3-multiunit.js',
@@ -52,16 +53,16 @@ for (const item of api.items) {
     per100g = Object.fromEntries(['p','f','c','a','kcal'].map(k => [k, Number(((Number(item.nutrition?.[k]) || 0) * m).toFixed(k === 'kcal' ? 2 : 4))]));
   }
   items.push({
-    id: item.id, runtimeIndex: item.runtimeIndex, legacyIndex: item.legacyIndex,
+    id: item.id, canonicalId: item.canonicalId || null, runtimeIndex: item.runtimeIndex, legacyIndex: item.legacyIndex,
     name: item.name, baseName: item.baseName, variant: item.variant,
     aliases: item.aliases || [], genericTags: item.genericTags || [], category: item.category, legacyCategory: item.legacyCategory,
     nutritionBasis: item.nutritionBasis, nutrition: item.nutrition, per100g,
-    input: item.input, source: item.source, confidence: item.confidence,
+    input: item.input, source: item.source, confidence: item.confidence, provenance: item.provenance || null,
     duplicateOf: item.duplicateOf || null
   });
 }
 const payload = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   sourceDb,
   effectiveRows: api.items.length,
@@ -72,9 +73,10 @@ const payload = {
     search: search.version,
     primaryVerified: context.__PFC_DB_V3_VERIFIED__?.version,
     b5Verified: context.__PFC_DB_V3_VERIFIED_B5__?.version,
+    mextPromoted: context.__PFC_DB_V3_MEXT_PROMOTED__?.version,
     catalog: context.__PFC_DB_V3_CATALOG__?.version
   },
   items
 };
 fs.writeFileSync(outPath, JSON.stringify(payload,null,2)+'\n');
-console.log(`FOOD_MASTER_EXPORT canonical=${items.length} effective=${api.items.length} output=${outPath}`);
+console.log(`FOOD_MASTER_EXPORT canonical=${items.length} effective=${api.items.length} mext=${items.filter(x => x.source?.kind === 'mext').length} output=${outPath}`);
