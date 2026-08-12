@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'overrides/pfc-database-v3-verified*.js'
+      - 'overrides/pfc-database-v3-mext-promoted.js'
       - 'scripts/mext-reconcile.py'
       - 'scripts/mext-reconcile-identifiers.py'
       - 'scripts/test-mext-reconcile.py'
@@ -44,6 +45,7 @@ jobs:
           python scripts/mext-reconcile-identifiers.py \
             --verified overrides/pfc-database-v3-verified.js \
             --verified overrides/pfc-database-v3-verified-b5.js \
+            --verified overrides/pfc-database-v3-mext-promoted.js \
             --out-json mext-reconcile-report.json \
             --out-md mext-reconcile-report.md
 

@@ -5,6 +5,8 @@ on:
     paths:
       - 'overrides/pfc-database-v3*.js'
       - 'scripts/export-effective-food-master.mjs'
+      - 'scripts/audit-food-master-provenance.mjs'
+      - 'scripts/test-database-v3-mext-promoted.mjs'
       - 'scripts/mext-map-food-master.py'
       - 'scripts/mext-map-food-master-fast.py'
       - 'scripts/test-mext-map-food-master.py'
@@ -47,8 +49,14 @@ jobs:
       - name: Install MEXT workbook parser
         run: python -m pip install --disable-pip-version-check 'openpyxl>=3.1,<4'
 
+      - name: Test MEXT promotion scaling/provenance
+        run: node scripts/test-database-v3-mext-promoted.mjs
+
       - name: Export effective canonical Food Master
         run: node scripts/export-effective-food-master.mjs _source_pfc/database.js food-master-effective.json
+
+      - name: Audit canonical provenance
+        run: node scripts/audit-food-master-provenance.mjs food-master-effective.json food-master-provenance-audit.json
 
       - name: Test mapping safety gates
         run: python scripts/test-mext-map-food-master.py
@@ -75,6 +83,12 @@ jobs:
         if: always()
         run: |
           if [ -s mext-food-master-map.md ]; then cat mext-food-master-map.md >> "$GITHUB_STEP_SUMMARY"; fi
+          if [ -s food-master-provenance-audit.json ]; then
+            echo '## Food Master provenance' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat food-master-provenance-audit.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload mapping evidence
         if: always()
@@ -83,6 +97,7 @@ jobs:
           name: mext-food-master-auto-map
           path: |
             food-master-effective.json
+            food-master-provenance-audit.json
             mext-food-master-map.json
             mext-food-master-map.md
           if-no-files-found: error

@@ -60,7 +60,8 @@ vm.runInContext(catalog, context, { filename: catalogPath });
 const api = context.__PFC_DB_V3__;
 const c = context.__PFC_DB_V3_CATALOG__;
 assert.ok(api && c);
-assert.equal(c.version, '3.1.1');
+assert.equal(c.version, '3.1.2');
+assert.equal(c.provenanceSchema, 1);
 
 assert.equal(api.get(0).input.defaultUnit, '食');
 assert.equal(api.get(0).input.type, 'portion');
@@ -105,6 +106,12 @@ if (!fs.existsSync(b5Path)) throw new Error(`Database V3 B5 layer missing: ${b5P
 const b5Test = path.join(process.cwd(), 'scripts', 'test-database-v3-b5.mjs');
 const b5 = spawnSync(process.execPath, [b5Test, verifiedPath, b5Path, corePath, catalogPath], { stdio: 'inherit' });
 if (b5.status !== 0) throw new Error('Database V3 B5 verified-food test suite failed');
+
+const promotedPath = path.join(path.dirname(corePath), 'pfc-database-v3-mext-promoted.js');
+if (!fs.existsSync(promotedPath)) throw new Error(`Database V3 MEXT promotion layer missing: ${promotedPath}`);
+const promotedTest = path.join(process.cwd(), 'scripts', 'test-database-v3-mext-promoted.mjs');
+const promoted = spawnSync(process.execPath, [promotedTest, promotedPath, corePath, catalogPath], { stdio: 'inherit' });
+if (promoted.status !== 0) throw new Error('Database V3 MEXT promotion/provenance test suite failed');
 
 const multiunitPath = path.join(path.dirname(corePath), 'pfc-database-v3-multiunit.js');
 if (!fs.existsSync(multiunitPath)) throw new Error(`Database V3 multi-unit layer missing: ${multiunitPath}`);
