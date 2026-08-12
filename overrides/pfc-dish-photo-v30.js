@@ -1,8 +1,8 @@
-// PFC Mirror V3.1: Gemini 3.5 Flash-Lite dish-photo identity with conservative visual rules.
+// PFC Mirror V3.2: Gemini 3.5 Flash-Lite visual identification with user-confirmed quantities.
 (() => {
   'use strict';
 
-  const VERSION = '3.1.0';
+  const VERSION = '3.2.0';
   const MODEL = 'gemini-3.5-flash-lite';
   const MAX_SIDE = 1280;
   const JPEG_QUALITY = 0.86;
@@ -18,6 +18,11 @@
   function parseVisibleCount(value) {
     const n = Math.round(Number(value));
     return Number.isFinite(n) && n >= 1 && n <= 30 ? n : null;
+  }
+
+  function parseAmount(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
   }
 
   function parseIdentityResponse(raw) {
@@ -37,20 +42,19 @@
         name,
         confidence: Math.max(0, Math.min(1, num(typeof item === 'string' ? 0.5 : object.confidence))),
         visibleCount: parseVisibleCount(object.visibleCount),
-        countCertain: object.countCertain === true,
-        variantVisible: object.variantVisible === true,
-        ambiguity: String(object.ambiguity || '').trim().slice(0, 80),
-        note: String(object.note || '').trim().slice(0, 80)
+        ambiguity: String(object.ambiguity || '').trim().slice(0, 100),
+        note: String(object.note || '').trim().slice(0, 100),
+        rawCountCertain: object.countCertain === true,
+        rawVariantVisible: object.variantVisible === true
       };
       if (seen.has(key)) {
         const existing = seen.get(key);
         existing.confidence = Math.max(existing.confidence, parsed.confidence);
-        if (parsed.countCertain && parsed.visibleCount) {
-          existing.visibleCount = parsed.visibleCount;
-          existing.countCertain = true;
-        }
-        existing.variantVisible = existing.variantVisible || parsed.variantVisible;
+        if (!existing.visibleCount && parsed.visibleCount) existing.visibleCount = parsed.visibleCount;
         if (!existing.ambiguity && parsed.ambiguity) existing.ambiguity = parsed.ambiguity;
+        if (!existing.note && parsed.note) existing.note = parsed.note;
+        existing.rawCountCertain = existing.rawCountCertain || parsed.rawCountCertain;
+        existing.rawVariantVisible = existing.rawVariantVisible || parsed.rawVariantVisible;
         continue;
       }
       seen.set(key, parsed);
@@ -64,6 +68,11 @@
     };
   }
 
+  function parentheticalDetail(value) {
+    const m = String(value || '').match(/[（(]([^()（）]+)[)）]/);
+    return m ? norm(m[1]) : '';
+  }
+
   function isUnsafeSpecificMatch(ai, result) {
     if (!ai || !result) return true;
     const candidate = String(result.name || result.meta?.name || '');
@@ -72,34 +81,35 @@
     if (!q || !c) return true;
     if (q === c) return false;
 
-    // Example: AI can only see "おにぎり", but search ranks "おにぎり(ツナ)".
-    // Never infer an invisible filling/flavor/variant from the database ranking.
     const candidateBase = baseName(candidate);
-    if (!ai.variantVisible && candidateBase === q && c !== q) return true;
-
-    // Parenthetical variants are considered specific unless AI explicitly saw the variant.
-    if (!ai.variantVisible && /[（(].+[)）]/.test(candidate) && c.includes(q)) return true;
+    const detail = parentheticalDetail(candidate);
+    if (detail) {
+      const explicitDetail = q.includes(detail) && q.includes(candidateBase);
+      if (!explicitDetail) return true;
+    }
+    if (candidateBase === q && c !== q) return true;
     return false;
   }
 
-  function resolveFood(ai) {
+  function searchHits(ai, minScore = 2000) {
     const search = window.__PFC_DB_V3_SEARCH__?.search;
-    if (typeof search !== 'function' || !ai?.name) return null;
-    const hits = search(ai.name, 8).filter(x => x?.source === 'db' && Number(x.score || 0) >= 2000);
-    return hits.find(hit => !isUnsafeSpecificMatch(ai, hit)) || null;
+    if (typeof search !== 'function' || !ai?.name) return [];
+    return search(ai.name, 8).filter(x => x?.source === 'db' && Number(x.score || 0) >= minScore);
+  }
+
+  function resolveFood(ai) {
+    return searchHits(ai).find(hit => !isUnsafeSpecificMatch(ai, hit)) || null;
   }
 
   function resolveFoods(identity) {
     return (identity?.foods || []).map(ai => {
       const match = resolveFood(ai);
-      if (!match) return { ai, match:null, reason:'no-safe-match' };
+      if (!match) return { ai, match:null, reason:'no-safe-match', amount:null, countSuggestion:null };
       const meta = match.meta || window.__PFC_DB_V3__?.get?.(match.index);
-      if (!meta) return { ai, match:null, reason:'no-meta' };
-      const defaultAmount = Number(meta.input?.defaultAmount || meta.nutritionBasis?.amount || 1);
+      if (!meta) return { ai, match:null, reason:'no-meta', amount:null, countSuggestion:null };
       const unit = String(meta.input?.defaultUnit || meta.nutritionBasis?.unit || '');
-      const countApplied = !!(ai.countCertain && ai.visibleCount && COUNT_UNITS.test(unit));
-      const amount = countApplied ? defaultAmount * ai.visibleCount : defaultAmount;
-      return { ai, match, meta, amount, countApplied };
+      const countSuggestion = ai.visibleCount && COUNT_UNITS.test(unit) ? ai.visibleCount : null;
+      return { ai, match, meta, unit, amount:null, countSuggestion, countApplied:false };
     });
   }
 
@@ -131,7 +141,7 @@
         <button type="button" id="dish-v30-camera"><b>カメラで撮る</b><span>今の食事をその場で撮影</span></button>
         <button type="button" id="dish-v30-library"><b>カメラロールから選ぶ</b><span>保存済みの写真を選択</span></button>
       </div>
-      <div class="dish-v30-note">Gemini 3.5 Flash-Liteは見えている食品名と個数だけを判定し、P/F/C/kcalはFood Masterから取得します。</div>`);
+      <div class="dish-v30-note">AIは見えている食品を候補化します。種類と量は追加前に人が確認し、写真だけでP/F/C/kcalを確定しません。</div>`);
     host.querySelector('#dish-v30-camera').onclick = () => { host.classList.remove('show'); selectPhoto('camera'); };
     host.querySelector('#dish-v30-library').onclick = () => { host.classList.remove('show'); selectPhoto('library'); };
   }
@@ -181,29 +191,22 @@
   }
 
   function identityPrompt() {
-    return `あなたは食事写真を監査する「視覚的食品識別器」です。栄養計算は別システムが行うため、画像から直接確認できる食品の同定だけをしてください。
+    return `あなたは食事写真の「視覚的食品抽出器」です。栄養値や量の確定は別システムと人間が行います。画像から直接見える事実だけをJSONで返してください。
 
-最重要原則:
-1. 見えていない情報を補完しない。具・味・肉の部位・ソース・調理法は視覚的証拠がある場合だけ具体化する。
-2. 例えば具が見えないおにぎりは必ず「おにぎり」。ツナ・鮭・梅などを推測しない。variantVisible=false。
-3. 弁当・定食・ワンプレートは「弁当」だけで終わらず、視覚的に区別できる食べ物を可能な限り個別列挙する。野菜・漬物・卵・副菜も食べられる物なら拾う。
-4. 同じ食品が複数個はっきり見える場合だけvisibleCountで数える。重なり等で個数を確定できなければvisibleCount=null,countCertain=false。
-5. 重量g、カロリー、P/F/C、油量、調味料量は絶対に推測・出力しない。
-6. 唐揚げか照り焼き等を断定できない場合は、最も安全な一般名（例「鶏料理」）をnameにし、ambiguityに候補を書く。無理に高confidenceにしない。
-7. confidenceは「その食品名が画像から直接確認できる確信度」。隠れた属性への自信ではない。0.95以上は視覚的にほぼ明白な場合だけ。
-8. 飾りや容器は除外。食品でない画像ならfoods=[]。
-9. 説明文・Markdown・[DATA]・[UNKNOWN]は禁止。JSONだけ返す。
+厳守:
+1. 弁当・定食・ワンプレートは全体名だけで終わらず、視覚的に区別できる食品をできる限り個別列挙する。野菜・漬物・卵・副菜も拾う。
+2. 見えない具、味、肉の部位、ソース、調理法を補完しない。具が見えないおにぎりは「おにぎり」とだけ書く。ツナ・鮭・梅などにしない。
+3. 食品名は画像だけで言える最も一般的で安全な日本語名にする。唐揚げか焼き物か断定できなければ「鶏料理」とし、ambiguityに候補を書く。
+4. visibleCountは「画面上で独立した個体数を数えられる食品」だけに使う。数えにくい、重なる、切断される場合はnull。数は回答前にもう一度数え直す。
+5. 重量g、ml、カロリー、P/F/C、油量、調味料量、1本=何g等は絶対に推測しない。
+6. confidenceは食品名そのものの視覚的確信度だけ。0.95以上は形状が非常に明白な場合だけ。ただしアプリはこの数値を確定判定には使わない。
+7. variantVisible/countCertain等の安全判断フラグは返さない。安全判定はアプリ側で行う。
+8. 食品でない画像ならfoods=[]。説明文、Markdown、[DATA]、[UNKNOWN]は禁止。JSONだけ返す。
 
-例A: 具が見えないおにぎりが3個見える
-{"dishName":"お弁当","uncertain":false,"foods":[{"name":"おにぎり","confidence":0.98,"visibleCount":3,"countCertain":true,"variantVisible":false,"ambiguity":"","note":"具は見えない"}]}
+例:
+{"dishName":"お弁当","uncertain":true,"foods":[{"name":"おにぎり","confidence":0.96,"visibleCount":3,"ambiguity":"","note":"具は見えない"},{"name":"鶏料理","confidence":0.76,"visibleCount":2,"ambiguity":"唐揚げまたは焼き物","note":""},{"name":"卵焼き","confidence":0.9,"visibleCount":3,"ambiguity":"","note":""},{"name":"にんじん","confidence":0.9,"visibleCount":null,"ambiguity":"","note":"少量の副菜"}]}
 
-例B: 鶏肉の調理法が断定できない
-{"dishName":"お弁当","uncertain":true,"foods":[{"name":"鶏料理","confidence":0.72,"visibleCount":2,"countCertain":true,"variantVisible":false,"ambiguity":"唐揚げまたは焼き物","note":""}]}
-
-返却形式:
-{"dishName":"料理全体の一般名または空文字","uncertain":false,"foods":[{"name":"白米","confidence":0.92,"visibleCount":1,"countCertain":true,"variantVisible":false,"ambiguity":"","note":""}]}
-
-最大${MAX_FOODS}食品。画像全体を一度見た後、見落としがないか再確認してからJSONを返してください。`;
+最大${MAX_FOODS}食品。画像全体を確認→食品を列挙→個数を再確認、の順でJSONだけ返してください。`;
   }
 
   async function identifyDish(base64) {
@@ -221,14 +224,17 @@
   }
 
   function nutritionPreview(row) {
-    const scaled = window.__PFC_DB_V3__?.scale?.(row.match.index, Number(row.amount));
-    return scaled ? `${scaled.kcal} kcal · P ${scaled.p} / F ${scaled.f} / C ${scaled.c}` : '';
+    const amount = parseAmount(row.amount);
+    if (!amount) return '量を入力するとP/F/C/kcalを表示';
+    const scaled = window.__PFC_DB_V3__?.scale?.(row.match.index, amount);
+    return scaled ? `${scaled.kcal} kcal · P ${scaled.p} / F ${scaled.f} / C ${scaled.c}` : '栄養値を計算できませんでした';
   }
 
-  function aiMetaText(ai) {
-    const parts = [`AI: ${ai.name}`, `${Math.round(ai.confidence*100)}%`];
-    if (ai.visibleCount) parts.push(ai.countCertain ? `見える個数 ${ai.visibleCount}` : `個数候補 ${ai.visibleCount}`);
-    if (ai.ambiguity) parts.push(`不確実: ${ai.ambiguity}`);
+  function aiMetaText(ai, countSuggestion = null) {
+    const parts = [`AI認識: ${ai.name}`];
+    if (countSuggestion) parts.push(`個数候補 ${countSuggestion}`);
+    else if (ai.visibleCount) parts.push(`見た目の個数候補 ${ai.visibleCount}`);
+    if (ai.ambiguity) parts.push(`要確認: ${ai.ambiguity}`);
     return parts.join(' · ');
   }
 
@@ -236,29 +242,50 @@
     const resolved = resolveFoods(identity);
     const matched = resolved.filter(x => x.match);
     const unmatched = resolved.filter(x => !x.match);
+
     if (!matched.length) {
-      const names = unmatched.map(x => `${esc(x.ai.name)}${x.ai.visibleCount ? ` ×${x.ai.visibleCount}` : ''}`).join('、');
-      const host = modal('Food Master候補なし', `<div class="dish-v30-message">AIは ${names || '食品'} を認識しましたが、具体的な具・種類を勝手に補完せず、安全に一致するFood Master食品がありませんでした。</div><button class="dish-v30-primary" id="dish-v30-close-result">閉じる</button>`);
+      const names = unmatched.map(x => `${esc(x.ai.name)}${x.ai.visibleCount ? ` ×${x.ai.visibleCount}候補` : ''}`).join('、');
+      const host = modal('食品を確認してください', `<div class="dish-v30-message">AIは ${names || '食品'} を認識しましたが、Food Masterの特定食品へ安全に自動一致できませんでした。具・種類・量を勝手に補完しないため、この結果は記録しません。</div><button class="dish-v30-primary" id="dish-v30-close-result">閉じる</button>`);
       host.querySelector('#dish-v30-close-result').onclick = () => host.classList.remove('show');
       return;
     }
 
     const cards = matched.map((row,i) => {
-      const unit = row.meta.input?.defaultUnit || row.meta.nutritionBasis?.unit || '食';
-      return `<label class="dish-v30-card" data-row="${i}"><div class="dish-v30-card-head"><input class="dish-v30-check" type="checkbox" checked><div><b>${esc(row.match.name)}</b><small>${esc(aiMetaText(row.ai))}</small></div></div><div class="dish-v30-amount"><input class="dish-v30-amount-input" type="number" min="0.1" step="0.1" value="${row.amount}"><span>${esc(unit)}</span></div><div class="dish-v30-pfc">${esc(nutritionPreview(row))}</div>${row.countApplied?'<small class="dish-v30-note">見えている個数を初期値へ反映しました。実際の量を確認してください。</small>':''}</label>`;
+      const unit = row.unit || row.meta.input?.defaultUnit || row.meta.nutritionBasis?.unit || '食';
+      const placeholder = row.countSuggestion ? String(row.countSuggestion) : '量を入力';
+      const countNote = row.countSuggestion
+        ? `<small class="dish-v30-note">AIの個数候補は ${row.countSuggestion}${esc(unit)}。未確定なので自動入力していません。</small>`
+        : '<small class="dish-v30-note">写真から重量・量は確定しません。実際の量を入力してください。</small>';
+      return `<label class="dish-v30-card" data-row="${i}"><div class="dish-v30-card-head"><input class="dish-v30-check" type="checkbox" checked><div><b>${esc(row.match.name)}</b><small>${esc(aiMetaText(row.ai,row.countSuggestion))}</small></div></div><div class="dish-v30-amount"><input class="dish-v30-amount-input" type="number" min="0.1" step="0.1" value="" placeholder="${esc(placeholder)}"><span>${esc(unit)}</span></div><div class="dish-v30-pfc">${esc(nutritionPreview(row))}</div>${countNote}</label>`;
     }).join('');
-    const unmatchedHtml = unmatched.length ? `<div class="dish-v30-message"><b>安全一致しなかった食品</b><br>${unmatched.map(x => `${esc(x.ai.name)}${x.ai.visibleCount?` ×${x.ai.visibleCount}`:''}`).join('、')}<br><small>具や種類が見えない食品を、Food Masterの特定バリエーションへ勝手に変換しません。</small></div>` : '';
-    const host = modal('Food Masterで確認', `${identity.dishName?`<div class="dish-v30-badge">AI判定: ${esc(identity.dishName)}</div>`:''}${cards}${unmatchedHtml}<div class="dish-v30-note">個数は見えている場合のみ初期値へ反映します。重量は写真から確定しません。</div><button class="dish-v30-primary" id="dish-v30-add">選択した食品を追加</button>`);
+
+    const unmatchedHtml = unmatched.length ? `<div class="dish-v30-message"><b>種類の確認が必要な食品</b><br>${unmatched.map(x => `${esc(x.ai.name)}${x.ai.visibleCount?` ×${x.ai.visibleCount}候補`:''}${x.ai.ambiguity?`（${esc(x.ai.ambiguity)}）`:''}`).join('、')}<br><small>Food Masterの特定バリエーションへ自動変換していません。例: 「おにぎり」から「ツナおにぎり」へは変換しません。</small></div>` : '';
+    const host = modal('写真認識を確認', `${identity.dishName?`<div class="dish-v30-badge">AI判定: ${esc(identity.dishName)}</div>`:''}${cards}${unmatchedHtml}<div class="dish-v30-note">AIの個数・種類は候補です。量を確認した食品だけ追加できます。</div><button class="dish-v30-primary" id="dish-v30-add" disabled>量を確認した食品を追加</button>`);
+
+    const addButton = host.querySelector('#dish-v30-add');
+    const refreshAddState = () => {
+      const cardsNow = [...host.querySelectorAll('.dish-v30-card')];
+      addButton.disabled = !cardsNow.some(card => card.querySelector('.dish-v30-check').checked && parseAmount(card.querySelector('.dish-v30-amount-input').value));
+    };
+
     host.querySelectorAll('.dish-v30-card').forEach((card,i) => {
       const input = card.querySelector('.dish-v30-amount-input');
-      input.oninput = () => { matched[i].amount = Math.max(0.1,num(input.value)); card.querySelector('.dish-v30-pfc').textContent = nutritionPreview(matched[i]); };
+      const check = card.querySelector('.dish-v30-check');
+      input.oninput = () => {
+        matched[i].amount = parseAmount(input.value);
+        card.querySelector('.dish-v30-pfc').textContent = nutritionPreview(matched[i]);
+        refreshAddState();
+      };
+      check.onchange = refreshAddState;
     });
-    host.querySelector('#dish-v30-add').onclick = () => {
+
+    addButton.onclick = () => {
       const records = [];
       host.querySelectorAll('.dish-v30-card').forEach((card,i) => {
         if (!card.querySelector('.dish-v30-check').checked) return;
         const row = matched[i];
-        const amount = Math.max(0.1, num(card.querySelector('.dish-v30-amount-input').value));
+        const amount = parseAmount(card.querySelector('.dish-v30-amount-input').value);
+        if (!amount) return;
         const record = window.__PFC_DB_V3__?.buildRecord?.(row.match.index, amount);
         if (record) {
           record._photoAI = {
@@ -267,10 +294,11 @@
             model:MODEL,
             aiName:row.ai.name,
             visualConfidence:row.ai.confidence,
-            visibleCount:row.ai.visibleCount,
-            countCertain:row.ai.countCertain,
-            variantVisible:row.ai.variantVisible,
-            ambiguity:row.ai.ambiguity || ''
+            visibleCountSuggestion:row.ai.visibleCount,
+            ambiguity:row.ai.ambiguity || '',
+            userConfirmedAmount:amount,
+            aiAmountAutoApplied:false,
+            aiVariantFlagsTrusted:false
           };
           records.push(record);
         }
@@ -280,7 +308,7 @@
       if (typeof sv === 'function') sv();
       if (typeof ren === 'function') ren();
       if (typeof upd === 'function') upd();
-      if (typeof showToast === 'function') showToast(`${records.length}件をFood Masterから追加しました`);
+      if (typeof showToast === 'function') showToast(`${records.length}件を確認して追加しました`);
       host.classList.remove('show');
     };
   }
@@ -288,7 +316,7 @@
   async function runDishPhoto(file) {
     if (busy) return;
     busy = true;
-    modal('料理写真を判定中','<div class="dish-v30-loading"><span></span><b>Gemini 3.5 Flash-Liteで確認しています</b></div><div class="dish-v30-note">見えていない具・味・重量は推測させません。</div>');
+    modal('料理写真を判定中','<div class="dish-v30-loading"><span></span><b>Gemini 3.5 Flash-Liteで食品を確認しています</b></div><div class="dish-v30-note">種類・個数は候補として扱い、量や栄養値を写真だけで確定しません。</div>');
     try {
       const identity = await identifyDish(await compressImage(file));
       if (!identity.foods.length) throw new Error('食べ物として認識できませんでした');
@@ -321,6 +349,9 @@
     conservativeVisual:true,
     genericToSpecificBlocked:true,
     visibleCount:true,
+    aiAmountAutoApplied:false,
+    aiVariantFlagsTrusted:false,
+    requiresUserAmount:true,
     cameraRoll:true,
     camera:true,
     parseIdentityResponse,
