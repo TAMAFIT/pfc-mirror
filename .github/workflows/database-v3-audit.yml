@@ -1,0 +1,45 @@
+name: Database V3 Audit
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mirror controls
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned PFC source read-only
+        uses: actions/checkout@v4
+        with:
+          repository: TAMAFIT/pfc
+          ref: cf2d53990860a108d96596abc6eed81e0afd32ae
+          path: _source_pfc
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Audit current food database
+        run: node scripts/audit-database-v3.mjs _source_pfc/database.js database-v3-audit.json
+
+      - name: Validate audit output
+        run: |
+          test -s database-v3-audit.json
+          test -s _source_pfc/database.js
+          node -e "const r=require('./database-v3-audit.json'); if(!r.totalRows || !r.categories || !r.unitFamilies) process.exit(1); console.log('audit-json-ok')"
+
+      - name: Upload audit report and source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-v3-audit
+          path: |
+            database-v3-audit.json
+            _source_pfc/database.js
