@@ -21,8 +21,16 @@ if(!html.includes('pfc-scan-v28.js')) html=html.replace('</body>',`    <script s
 fs.writeFileSync(htmlPath,html,'utf8');
 const final=fs.readFileSync(jsOut,'utf8');
 for(const marker of ['__PFC_SCAN_V28__',"VERSION = '2.8.0'",'@zxing/browser@0.2.1','tesseract.js@7.0.0','open-food-facts','label-ocr','parseNutritionLabelText']) if(!final.includes(marker)) throw new Error(`scan V2.8 marker missing: ${marker}`);
-const finalHtml=fs.readFileSync(htmlPath,'utf8');
+let finalHtml=fs.readFileSync(htmlPath,'utf8');
 if(!finalHtml.includes(`pfc-scan-v28.js?v=${jsHash}`)||!finalHtml.includes(`pfc-scan-v28.css?v=${cssHash}`)) throw new Error('scan V2.8 cache-busted assets missing');
 const test=spawnSync(process.execPath,[path.join(root,'scripts','test-scan-v28.mjs'),jsOut],{stdio:'inherit'});
 if(test.status!==0) throw new Error('scan V2.8 unit tests failed');
+
+const dishApply=path.join(root,'scripts','apply-dish-photo-v29.mjs');
+if(fs.existsSync(dishApply)){
+  const dish=spawnSync(process.execPath,[dishApply],{stdio:'inherit'});
+  if(dish.status!==0) throw new Error('dish photo V2.9 build step failed');
+  finalHtml=fs.readFileSync(htmlPath,'utf8');
+  if(!finalHtml.includes('pfc-dish-photo-v29.js?v=')) throw new Error('dish photo V2.9 final script missing');
+}
 console.log(`PFC scan V2.8 applied (${jsHash}/${cssHash}).`);
