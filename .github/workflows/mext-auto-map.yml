@@ -7,6 +7,7 @@ on:
       - 'overrides/pfc-food-master-mext-registry.js'
       - 'scripts/export-effective-food-master.mjs'
       - 'scripts/audit-food-master-provenance.mjs'
+      - 'scripts/triage-mext-review-queue.py'
       - 'scripts/test-database-v3-mext-promoted.mjs'
       - 'scripts/mext-map-food-master.py'
       - 'scripts/mext-map-food-master-fast.py'
@@ -33,7 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TAMAFIT/pfc
-          ref: cf2d53990860a108d96596abc6eed81e0afd32ae
+          ref: cf2d53990860a1086eed81e0afd32ae
           path: _source_pfc
           persist-credentials: false
 
@@ -80,10 +81,21 @@ jobs:
           print(f"sha256={r['source']['sha256']}")
           PY
 
+      - name: Triage unresolved candidates by blocking reason
+        run: |
+          python scripts/triage-mext-review-queue.py \
+            --map mext-food-master-map.json \
+            --out-json mext-review-triage.json \
+            --out-md mext-review-triage.md
+
       - name: Publish mapping summary
         if: always()
         run: |
           if [ -s mext-food-master-map.md ]; then cat mext-food-master-map.md >> "$GITHUB_STEP_SUMMARY"; fi
+          if [ -s mext-review-triage.md ]; then
+            echo >> "$GITHUB_STEP_SUMMARY"
+            cat mext-review-triage.md >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ -s food-master-provenance-audit.json ]; then
             echo '## Food Master provenance' >> "$GITHUB_STEP_SUMMARY"
             echo '```json' >> "$GITHUB_STEP_SUMMARY"
@@ -101,6 +113,8 @@ jobs:
             food-master-provenance-audit.json
             mext-food-master-map.json
             mext-food-master-map.md
+            mext-review-triage.json
+            mext-review-triage.md
           if-no-files-found: error
 
       - name: Comment pull request
@@ -111,6 +125,13 @@ jobs:
         shell: bash
         run: |
           if [ -s mext-food-master-map.md ]; then
-            { echo '<!-- pfc-mext-auto-map -->'; cat mext-food-master-map.md; } > /tmp/mext-map-comment.md
+            {
+              echo '<!-- pfc-mext-auto-map -->'
+              cat mext-food-master-map.md
+              if [ -s mext-review-triage.md ]; then
+                echo
+                cat mext-review-triage.md
+              fi
+            } > /tmp/mext-map-comment.md
             gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/mext-map-comment.md --edit-last --create-if-none
           fi
