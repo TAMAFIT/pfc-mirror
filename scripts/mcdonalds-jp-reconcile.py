@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 UA='TAMAFIT-PFC-FoodMaster-Restaurant-Reconciler/1.0 (+https://github.com/TAMAFIT/pfc-mirror)'
-LIST_URL='https://www.mcdonalds.co.jp/en/allergy/'
+LIST_URL='https://www.mcdonalds.co.jp/en/quality/allergy_Nutrition/nutrient/'
 SIDE_URL='https://www.mcdonalds.co.jp/en/menu/side/'
 
 class TableParser(html.parser.HTMLParser):
@@ -67,13 +67,37 @@ def parse_registry(path):
     if not m: raise RuntimeError('restaurant registry data block not found')
     return json.loads(m.group(1))
 
+def header_index(header, needles):
+    normalized=[norm(x) for x in needles]
+    for i,cell in enumerate(header):
+        key=norm(cell)
+        if any(n == key or n in key for n in normalized): return i
+    return None
+
+def nutrition_columns(parser):
+    for row in parser.rows:
+        keys=[norm(x) for x in row]
+        if not any('productname' in x or x=='商品名' for x in keys): continue
+        cols={
+            'name': header_index(row,['Product Name','商品名']),
+            'kcal': header_index(row,['Calories','Energy','エネルギー']),
+            'p': header_index(row,['Protein','たんぱく質']),
+            'f': header_index(row,['Fat','脂質']),
+            'c': header_index(row,['Carbohydrate','炭水化物'])
+        }
+        if all(v is not None for v in cols.values()): return cols
+    return None
+
 def parse_burger_list(parser,entries):
+    cols=nutrition_columns(parser)
+    if not cols: return {}
+    max_col=max(cols.values())
     rows=[]
     for row in parser.rows:
-        if len(row)<5: continue
-        vals=[number(x) for x in row[1:5]]
-        if any(v is None for v in vals): continue
-        rows.append((norm(row[0]),row,vals))
+        if len(row)<=max_col: continue
+        vals={k:number(row[i]) for k,i in cols.items() if k!='name'}
+        if any(v is None for v in vals.values()): continue
+        rows.append((norm(row[cols['name']]),row,vals))
     found={}
     for entry in entries:
         if entry.get('sourceMode')!='nutrition-list': continue
@@ -83,10 +107,9 @@ def parse_burger_list(parser,entries):
         matches=exact or prefix
         if len(matches)!=1: continue
         _,row,vals=matches[0]
-        kcal,p,f,c=vals
         found[entry['canonicalId']]={
-            'canonicalId':entry['canonicalId'],'name':entry['name'],'officialName':row[0],
-            'sourceUrl':LIST_URL,'nutrition':{'p':p,'f':f,'c':c,'kcal':kcal,'a':0.0}
+            'canonicalId':entry['canonicalId'],'name':entry['name'],'officialName':row[cols['name']],
+            'sourceUrl':LIST_URL,'nutrition':{'p':vals['p'],'f':vals['f'],'c':vals['c'],'kcal':vals['kcal'],'a':0.0}
         }
     return found
 
