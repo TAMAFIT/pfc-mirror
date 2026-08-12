@@ -7,7 +7,9 @@ on:
       - 'scripts/route-food-master-providers.py'
       - 'scripts/test-food-master-provider-routing.py'
       - 'scripts/export-effective-food-master.mjs'
+      - 'scripts/audit-food-master-official-sources.mjs'
       - 'overrides/pfc-food-master-mext-registry.js'
+      - 'overrides/pfc-food-master-restaurant-registry.js'
       - '.github/workflows/food-master-provider-routing.yml'
   workflow_dispatch:
   schedule:
@@ -49,6 +51,9 @@ jobs:
       - name: Export effective Food Master
         run: node scripts/export-effective-food-master.mjs _source_pfc/database.js food-master-effective.json
 
+      - name: Audit official source namespaces
+        run: node scripts/audit-food-master-official-sources.mjs food-master-effective.json food-master-official-source-audit.json
+
       - name: Route foods to authoritative providers
         run: |
           python scripts/route-food-master-providers.py \
@@ -64,13 +69,19 @@ jobs:
           r=json.load(open('food-master-provider-routing.json',encoding='utf-8'))
           assert r['canonicalRows']==439, r['canonicalRows']
           assert sum(r['statusCounts'].values())==439
-          assert r['statusCounts'].get('verified',0)>=46
+          assert r['statusCounts'].get('verified',0)>=57
           assert not any(x['nutritionProvider']=='manual-review' for x in r['queue'])
           print('provider-routing-ok',r['statusCounts'])
           PY
 
       - name: Publish routing summary
-        run: cat food-master-provider-routing.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          cat food-master-provider-routing.md >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo '## Official-source audit' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat food-master-official-source-audit.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload routing evidence
         uses: actions/upload-artifact@v4
@@ -79,6 +90,7 @@ jobs:
           path: |
             food-master-provider-routing.json
             food-master-provider-routing.md
+            food-master-official-source-audit.json
             food-master-effective.json
 
       - name: Comment pull request
