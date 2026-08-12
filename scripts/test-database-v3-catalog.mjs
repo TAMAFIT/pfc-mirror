@@ -111,3 +111,9 @@ if (!fs.existsSync(multiunitPath)) throw new Error(`Database V3 multi-unit layer
 const multiunitTest = path.join(process.cwd(), 'scripts', 'test-database-v3-multiunit.mjs');
 const multiunitResult = spawnSync(process.execPath, [multiunitTest, verifiedPath, corePath, catalogPath, multiunitPath], { stdio: 'inherit' });
 if (multiunitResult.status !== 0) throw new Error('Database V3 multi-unit test suite failed');
+
+const searchPath = path.join(path.dirname(corePath), 'pfc-database-v3-search.js');
+if (!fs.existsSync(searchPath)) throw new Error(`Database V3 search layer missing: ${searchPath}`);
+const searchTest = path.join(process.cwd(), 'scripts', 'test-database-v3-search.mjs');
+const searchResult = spawnSync(process.execPath, [searchTest, verifiedPath, b5Path, corePath, catalogPath, searchPath], { stdio: 'inherit' });
+if (searchResult.status !== 0) throw new Error('Database V3 canonical search test suite failed');
