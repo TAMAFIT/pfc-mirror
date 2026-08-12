@@ -10,19 +10,50 @@ const cssSource = path.join(root,'overrides','pfc-dish-photo-v30.css');
 const jsOut = path.join(dist,'pfc-dish-photo-v30.js');
 const cssOut = path.join(dist,'pfc-dish-photo-v30.css');
 const htmlPath = path.join(dist,'index.html');
-for (const file of [jsSource,cssSource,htmlPath]) if (!fs.existsSync(file)) throw new Error(`dish photo v3.5 dependency missing: ${file}`);
+for (const file of [jsSource,cssSource,htmlPath]) if (!fs.existsSync(file)) throw new Error(`dish photo v3.6 dependency missing: ${file}`);
 
 let js = fs.readFileSync(jsSource,'utf8');
 const css = fs.readFileSync(cssSource);
 
 function replaceOnce(from, to, label) {
-  if (!js.includes(from)) throw new Error(`dish photo v3.5 patch anchor missing: ${label}`);
+  if (!js.includes(from)) throw new Error(`dish photo v3.6 patch anchor missing: ${label}`);
   js = js.replace(from, to);
 }
 
-replaceOnce('PFC Mirror V3.3:', 'PFC Mirror V3.5:', 'header');
-replaceOnce("const VERSION = '3.3.0';", "const VERSION = '3.5.0';", 'version');
+replaceOnce('PFC Mirror V3.3:', 'PFC Mirror V3.6:', 'header');
+replaceOnce("const VERSION = '3.3.0';", "const VERSION = '3.6.0';", 'version');
 replaceOnce('const REQUEST_TIMEOUT_MS = 32000;', 'const REQUEST_TIMEOUT_MS = 25000;', 'timeout');
+
+js = js.replace(
+  /  function isUnsafeSpecificMatch\(ai, result\) \{[\s\S]*?\n  \}\n\n  function searchHits/,
+  `  function isUnsafeSpecificMatch(ai, result) {
+    if (!ai || !result) return true;
+    const fold = value => norm(value)
+      .replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+      .replace(/[・･]/g, '');
+    const candidate = String(result.name || result.meta?.name || '');
+    const q = fold(ai.name);
+    const c = fold(candidate);
+    if (!q || !c) return true;
+    if (q === c) return false;
+
+    // A strict containment difference means one name is more specific than the other.
+    // Never infer hidden fillings, flavors, cuts, brands or variants from a photo query.
+    if (c.includes(q) || q.includes(c)) return true;
+
+    // The only non-identical automatic match allowed is a curated exact alias.
+    // Orthographic aliases such as にんじん -> 人参 are safe; broad aliases such as
+    // おにぎり -> ツナマヨおにぎり remain blocked by the containment rule above.
+    const aliases = Array.isArray(result.meta?.aliases) ? result.meta.aliases : [];
+    if (aliases.some(alias => fold(alias) === q)) return false;
+
+    // All remaining prefix/substring/fuzzy search results require user confirmation.
+    return true;
+  }
+
+  function searchHits`
+);
+if (!js.includes('All remaining prefix/substring/fuzzy search results require user confirmation')) throw new Error('dish photo v3.6 specificity guard patch failed');
 
 js = js.replace(
   /  function identityPrompt\(\) \{[\s\S]*?\n  \}\n\n  function buildRequestPayload/,
@@ -40,7 +71,7 @@ js = js.replace(
 
   function buildRequestPayload`
 );
-if (!js.includes('少しでも曖昧ならnullを優先する')) throw new Error('dish photo v3.5 prompt patch failed');
+if (!js.includes('少しでも曖昧ならnullを優先する')) throw new Error('dish photo v3.6 prompt patch failed');
 
 replaceOnce(
   'maxOutputTokens:1024\n      }',
@@ -56,12 +87,17 @@ js = js.replace(
 
   function nutritionPreview`
 );
-if (!js.includes('return await requestIdentity(base64);')) throw new Error('dish photo v3.5 single-request patch failed');
+if (!js.includes('return await requestIdentity(base64);')) throw new Error('dish photo v3.6 single-request patch failed');
 
 replaceOnce(
   'latencyOptimized:true,\n    retryTransient:true,',
   "latencyOptimized:true,\n    structuredJson:true,\n    mediaResolution:'MEDIA_RESOLUTION_LOW',\n    autoRetry:false,\n    retryTransient:false,",
   'low-media single-request markers'
+);
+replaceOnce(
+  'genericToSpecificBlocked:true,\n    visibleCount:true,',
+  'genericToSpecificBlocked:true,\n    strictSpecificityGuard:true,\n    visibleCount:true,',
+  'strict specificity marker'
 );
 replaceOnce(
   'resolveFoods,\n    buildRequestPayload,',
@@ -75,7 +111,7 @@ fs.writeFileSync(jsOut,js,'utf8');
 fs.copyFileSync(cssSource,cssOut);
 let html = fs.readFileSync(htmlPath,'utf8');
 for (const obsolete of ['pfc-scan-v28.js','pfc-scan-v28.css','pfc-dish-photo-v29.js','pfc-dish-photo-v29.css','pfc-dish-photo-v29-bootstrap.js']) {
-  if (html.includes(obsolete)) throw new Error(`obsolete scan asset still injected before v3.5: ${obsolete}`);
+  if (html.includes(obsolete)) throw new Error(`obsolete scan asset still injected before v3.6: ${obsolete}`);
 }
 if (!html.includes('pfc-dish-photo-v30.css')) html = html.replace('</head>',`    <link rel="stylesheet" href="pfc-dish-photo-v30.css?v=${cssHash}">\n</head>`);
 if (!html.includes('pfc-dish-photo-v30.js')) html = html.replace('</body>',`    <script src="pfc-dish-photo-v30.js?v=${jsHash}"></script>\n</body>`);
@@ -83,7 +119,7 @@ fs.writeFileSync(htmlPath,html,'utf8');
 
 for (const marker of [
   '__PFC_DISH_PHOTO_V30__',
-  "VERSION = '3.5.0'",
+  "VERSION = '3.6.0'",
   "MODEL = 'gemini-3.5-flash-lite'",
   "THINKING_LEVEL = 'minimal'",
   'REQUEST_TIMEOUT_MS = 25000',
@@ -94,11 +130,12 @@ for (const marker of [
   'autoRetry:false',
   'retryTransient:false',
   'genericToSpecificBlocked:true',
+  'strictSpecificityGuard:true',
   'aiAmountAutoApplied:false',
   'requiresUserAmount:true',
   '料理写真'
-]) if (!js.includes(marker)) throw new Error(`dish photo v3.5 marker missing: ${marker}`);
+]) if (!js.includes(marker)) throw new Error(`dish photo v3.6 marker missing: ${marker}`);
 
 const test = spawnSync(process.execPath,[path.join(root,'scripts','test-dish-photo-v30.mjs'),jsOut],{stdio:'inherit'});
-if (test.status !== 0) throw new Error('dish photo v3.5 tests failed');
-console.log(`PFC dish photo v3.5 applied (${jsHash}/${cssHash}).`);
+if (test.status !== 0) throw new Error('dish photo v3.6 tests failed');
+console.log(`PFC dish photo v3.6 applied (${jsHash}/${cssHash}).`);
