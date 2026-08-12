@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
 const dist = path.join(root, 'dist');
@@ -31,4 +32,12 @@ const corePos = finalHtml.indexOf('pfc-database-v3.js');
 const catalogPos = finalHtml.indexOf('pfc-database-v3-catalog.js');
 if (!(mextPos >= 0 && restaurantPos > mextPos && corePos > restaurantPos && catalogPos > corePos)) throw new Error('Restaurant registry script ordering is invalid');
 if (!finalHtml.includes(`pfc-food-master-restaurant-registry.js?v=${cache}`)) throw new Error('Restaurant registry cache key missing');
+
+const testPath = path.join(root, 'scripts', 'test-food-master-restaurant-registry.mjs');
+const corePath = path.join(dist, 'pfc-database-v3.js');
+const catalogPath = path.join(dist, 'pfc-database-v3-catalog.js');
+for (const file of [testPath, corePath, catalogPath]) if (!fs.existsSync(file)) throw new Error(`Restaurant registry test dependency missing: ${file}`);
+const test = spawnSync(process.execPath, [testPath, output, corePath, catalogPath], { stdio: 'inherit' });
+if (test.status !== 0) throw new Error('Official restaurant Food Master registry test failed');
+
 console.log(`Food Master restaurant registry applied (${cache}).`);
