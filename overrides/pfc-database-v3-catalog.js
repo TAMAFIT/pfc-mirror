@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.1.1';
+  const VERSION = '3.1.2';
   const BASE_VERSION = '3.1.0';
   const BUNDLE_MIGRATION_MARKER = 'pfc-db-v3-bundle-units-310';
 
@@ -120,6 +120,16 @@
         meta.confidence = hint.confidence || 'high';
         meta.verifiedVersion = hint.verifiedVersion;
         meta.unitConfidence = hint.serving?.exactForEntry === true ? 'high' : meta.unitConfidence;
+        if (hint.canonicalId) meta.canonicalId = hint.canonicalId;
+        else if (hint.source?.kind === 'mext' && hint.source?.itemNo) meta.canonicalId = `mext:${hint.source.itemNo}`;
+        meta.provenance = {
+          sourceKind: hint.source?.kind || null,
+          sourceId: hint.source?.itemNo || hint.source?.productId || null,
+          confidence: hint.confidence || 'high',
+          verifiedAt: hint.verifiedAt || hint.source?.verifiedAt || null,
+          verifiedVersion: hint.verifiedVersion || null,
+          datasetSha256: hint.source?.datasetSha256 || null
+        };
       });
     });
   }
@@ -160,6 +170,7 @@
       mealServingFoods: [...MEAL_AS_ONE_SERVING],
       packageOverrides: { ...PACKAGE_OVERRIDES },
       verifiedSourcesApplied: Object.keys(window.__PFC_DB_V3_VERIFIED_SOURCES__ || {}).length,
+      provenanceSchema: 1,
       sources: {
         maffRiceServingGuide: RICE_SERVING_REFERENCE.url,
         maffEggStandard: EGG_SIZE_REFERENCE.url
