@@ -7,6 +7,7 @@ const runtimePath = process.argv[2] || 'dist/pfc-food-master-runtime.js';
 const manifestPath = process.argv[3] || 'dist/food-master-manifest.json';
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const currentManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const flushAsyncWork = () => new Promise(resolve => setImmediate(resolve));
 
 function arrayBufferFromString(value) {
   const bytes = Buffer.from(String(value));
@@ -115,15 +116,13 @@ assert.ok(context.__fetchLog.some(url => url.endsWith('/pfc-mirror/index.html'))
 // Generic deferred work returns pending immediately, then confirms asynchronously.
 const successTask = api.defer('demo-success', async () => 42);
 assert.equal(successTask.status, 'pending');
-await Promise.resolve();
-await Promise.resolve();
+await flushAsyncWork();
 assert.equal(api.getTask(successTask.id).status, 'confirmed');
 assert.equal(api.getTask(successTask.id).result, 42);
 
 const failedTask = api.defer('demo-failure', async () => { throw new Error('expected failure'); });
 assert.equal(failedTask.status, 'pending');
-await Promise.resolve();
-await Promise.resolve();
+await flushAsyncWork();
 assert.equal(api.getTask(failedTask.id).status, 'failed');
 assert.match(api.getTask(failedTask.id).error, /expected failure/);
 
