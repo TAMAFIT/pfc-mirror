@@ -47,7 +47,7 @@ def norm(value):
         code=ord(ch)
         if 0x30A1<=code<=0x30F6: ch=chr(code-0x60)
         out.append(ch)
-    return re.sub(r'[^0-9a-zぁ-ん]+','',''.join(out))
+    return re.sub(r'[^0-9a-zぁ-ん一-龯々]+','',''.join(out))
 
 def number(value):
     m=re.search(r'-?\d+(?:\.\d+)?',str(value or '').replace(',',''))
@@ -68,7 +68,7 @@ def parse_registry(path):
     return json.loads(m.group(1))
 
 def header_index(header, needles):
-    normalized=[norm(x) for x in needles]
+    normalized=[norm(x) for x in needles if norm(x)]
     for i,cell in enumerate(header):
         key=norm(cell)
         if any(n == key or n in key for n in normalized): return i
@@ -141,7 +141,7 @@ def with_size(url,size):
     return urllib.parse.urlunparse(parsed._replace(query=query))
 
 def row_value(parser,labels):
-    normalized=[norm(x) for x in labels]
+    normalized=[norm(x) for x in labels if norm(x)]
     for row in parser.rows:
         if not row: continue
         first=norm(row[0])
