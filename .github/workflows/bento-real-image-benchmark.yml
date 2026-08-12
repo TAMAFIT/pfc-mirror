@@ -1,0 +1,48 @@
+name: Real bento image benchmark
+
+on:
+  push:
+    branches: [agent/gas-image-smoke]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - name: Benchmark exact bento image
+        env:
+          GAS_URL: https://script.google.com/macros/s/AKfycbxRNfeijUEwXwoFgBYbS60S5zn2fcuqHSm4TAbRePUzjTjqInXu10ZmK4cUvxoJ-dCAxw/exec
+          IMAGE_URL: https://prcdn.freetls.fastly.net/release_image/18729/249/18729-249-28ac67e221d90394183b2656e4b3beb2-1080x1080.jpg
+        run: |
+          python - <<'PY'
+          import base64,io,json,os,time,urllib.request,urllib.error
+          from PIL import Image
+
+          with urllib.request.urlopen(os.environ['IMAGE_URL'], timeout=30) as r:
+              raw=r.read()
+          im=Image.open(io.BytesIO(raw)).convert('RGB')
+          im.thumbnail((720,720))
+          b=io.BytesIO(); im.save(b,'JPEG',quality=80); jpg=base64.b64encode(b.getvalue()).decode()
+          print(json.dumps({'source_size':len(raw),'test_size':len(b.getvalue()),'dimensions':im.size},ensure_ascii=False))
+
+          prompt='''あなたは食事写真の視覚的食品抽出器です。画像から直接見える食品だけをJSONで返してください。\n- 弁当は全体名だけで終わらず、区別できる食品と副菜を個別に拾う。\n- 見えない具・味・肉の部位・調理法を推測しない。具が見えないおにぎりは「おにぎり」。\n- 曖昧な料理は一般名にしてambiguityへ候補を書く。\n- visibleCountは独立した個体を明確に数えられる時だけ。\n- 重量、PFC、kcal、油・調味料量は推測しない。\n- JSON以外は禁止。\n形式: {"dishName":"","uncertain":true,"foods":[{"name":"","confidence":0.0,"visibleCount":null,"ambiguity":"","note":""}]}\n最大10食品。'''
+
+          def probe(label,model,thinking):
+              p={'taskType':'image','modelPreference':model,'contents':[{'parts':[{'text':prompt}]}],'imageBase64':jpg,'generationConfig':{'maxOutputTokens':768,'thinkingConfig':thinking,'responseMimeType':'application/json'}}
+              req=urllib.request.Request(os.environ['GAS_URL'],data=json.dumps(p).encode(),headers={'Content-Type':'text/plain'},method='POST'); t=time.perf_counter()
+              try:
+                  with urllib.request.urlopen(req,timeout=70) as r:
+                      body=r.read().decode(errors='replace')
+                      print(json.dumps({'label':label,'model':model,'status':r.status,'sec':round(time.perf_counter()-t,3),'body':body[:5000]},ensure_ascii=False))
+              except urllib.error.HTTPError as e:
+                  print(json.dumps({'label':label,'model':model,'status':e.code,'sec':round(time.perf_counter()-t,3),'body':e.read().decode(errors='replace')[:3000]},ensure_ascii=False))
+              except Exception as e:
+                  print(json.dumps({'label':label,'model':model,'sec':round(time.perf_counter()-t,3),'error':repr(e)},ensure_ascii=False))
+
+          probe('3.5-real-bento','gemini-3.5-flash-lite',{'thinkingLevel':'minimal'})
+          probe('2.5-real-bento','gemini-2.5-flash-lite',{'thinkingBudget':0})
+          PY
