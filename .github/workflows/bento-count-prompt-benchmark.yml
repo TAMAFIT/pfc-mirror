@@ -1,0 +1,43 @@
+name: Bento count prompt benchmark
+
+on:
+  push:
+    branches: [agent/gas-image-smoke]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - name: Compare grounded counting prompts
+        env:
+          GAS_URL: https://script.google.com/macros/s/AKfycbxRNfeijUEwXwoFgBYbS60S5zn2fcuqHSm4TAbRePUzjTjqInXu10ZmK4cUvxoJ-dCAxw/exec
+          IMAGE_URL: https://prcdn.freetls.fastly.net/release_image/18729/249/18729-249-28ac67e221d90394183b2656e4b3beb2-1080x1080.jpg
+        run: |
+          python - <<'PY'
+          import base64,io,json,os,time,urllib.request,urllib.error
+          from PIL import Image
+          with urllib.request.urlopen(os.environ['IMAGE_URL'],timeout=30) as r: raw=r.read()
+          im=Image.open(io.BytesIO(raw)).convert('RGB'); im.thumbnail((720,720)); b=io.BytesIO(); im.save(b,'JPEG',quality=80); jpg=base64.b64encode(b.getvalue()).decode()
+
+          common='''画像から直接見える食べ物だけを抽出する。弁当は食品ごとに分ける。見えない具・味・肉部位・調理法を推測しない。重量・PFC・kcalは出さない。曖昧な料理は一般名にしてambiguityへ候補を書く。JSON以外は禁止。最大10食品。'''
+          prompts={
+            'baseline': common+'''\n形式:{"dishName":"","foods":[{"name":"","visibleCount":null,"ambiguity":"","note":""}]}。visibleCountは明確に独立した個体だけ数え、重なる場合はnull。回答前に画像全体を再確認する。''',
+            'instances': common+'''\n数えられる食品は、まず見えている各個体を重複なしでinstancesに1件ずつ列挙し、それぞれのおおよその位置を左上/上/右上/左/中央/右/左下/下/右下から選ぶ。visibleCountはinstancesの件数と必ず一致させる。同じ物体を別食品として二重計上しない。数えにくければinstances=[]かつvisibleCount=null。形式:{"dishName":"","foods":[{"name":"","instances":[{"position":""}],"visibleCount":null,"ambiguity":"","note":""}]}。''',
+            'scan_order': common+'''\n個数を数えるときは、画像を左上→右上→左下→右下の順に1回だけ走査し、同じ個体を二度数えない。食品名ごとにdistinctObjectsへ各個体の短い位置説明を列挙してからvisibleCountをその配列長にする。重なりで区別できない場合はnull。形式:{"dishName":"","foods":[{"name":"","distinctObjects":[""],"visibleCount":null,"ambiguity":"","note":""}]}。'''
+          }
+          def probe(label,prompt):
+              p={'taskType':'image','modelPreference':'gemini-3.5-flash-lite','contents':[{'parts':[{'text':prompt}]}],'imageBase64':jpg,'generationConfig':{'maxOutputTokens':900,'thinkingConfig':{'thinkingLevel':'minimal'},'responseMimeType':'application/json'}}
+              req=urllib.request.Request(os.environ['GAS_URL'],data=json.dumps(p).encode(),headers={'Content-Type':'text/plain'},method='POST'); t=time.perf_counter()
+              try:
+                  with urllib.request.urlopen(req,timeout=70) as r:
+                      body=r.read().decode(errors='replace'); print(json.dumps({'label':label,'status':r.status,'sec':round(time.perf_counter()-t,3),'body':body[:7000]},ensure_ascii=False))
+              except urllib.error.HTTPError as e:
+                  print(json.dumps({'label':label,'status':e.code,'sec':round(time.perf_counter()-t,3),'body':e.read().decode(errors='replace')[:3000]},ensure_ascii=False))
+              except Exception as e: print(json.dumps({'label':label,'sec':round(time.perf_counter()-t,3),'error':repr(e)},ensure_ascii=False))
+          for label,prompt in prompts.items(): probe(label,prompt)
+          PY
