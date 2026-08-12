@@ -3,6 +3,7 @@
   'use strict';
 
   const VERSION = '3.1.1';
+  const BASE_VERSION = '3.1.0';
   const BUNDLE_MIGRATION_MARKER = 'pfc-db-v3-bundle-units-310';
 
   // These are semantic/unit corrections only. Nutrition values remain untouched.
@@ -153,6 +154,7 @@
 
     window.__PFC_DB_V3_CATALOG__ = {
       version: VERSION,
+      baseVersion: BASE_VERSION,
       semanticOnly: true,
       bundleCountFoods: Object.keys(BUNDLE_COUNT_BASES),
       mealServingFoods: [...MEAL_AS_ONE_SERVING],
