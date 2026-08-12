@@ -8,7 +8,7 @@ from PIL import Image
 
 URLS = {
     'prod-v3': 'https://script.google.com/macros/s/AKfycbxRNfeijUEwXwoFgBYbS60S5zn2fcuqHSm4TAbRePUzjTjqInXu10ZmK4cUvxoJ-dCAxw/exec',
-    'head': 'https://script.google.com/macros/s/AKfycbzCobPooFoCOXDhCTCQR4xYdVcaCEDlfKx9L9wvhLw_/exec',
+    'redundant-v4': 'https://script.google.com/macros/s/AKfycbzmnAYgNXoNbS4UYDU7t1iO70j6OeXLm5CaIaN4P-8Mx27dqLPRU20ewtGAtiJjC0Z7FA/exec',
 }
 IMAGE_URL = 'https://prcdn.freetls.fastly.net/release_image/18729/249/18729-249-28ac67e221d90394183b2656e4b3beb2-1080x1080.jpg'
 PROMPT = '''あなたは食事写真の視覚的食品抽出器です。画像から直接見える食べ物だけを日本語で抽出し、JSONだけ返してください。
@@ -42,22 +42,21 @@ payload = {
 }
 
 def one(label, i):
-    url = URLS[label]
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={'Content-Type':'text/plain'}, method='POST')
+    req = urllib.request.Request(URLS[label], data=json.dumps(payload).encode(), headers={'Content-Type':'text/plain'}, method='POST')
     started = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=35) as r:
             body = r.read().decode(errors='replace')
-            print(json.dumps({'deployment':label,'attempt':i,'status':r.status,'seconds':round(time.perf_counter()-started,3),'final_url':r.geturl(),'body':body[:1000]}, ensure_ascii=False))
+            print(json.dumps({'deployment':label,'attempt':i,'status':r.status,'seconds':round(time.perf_counter()-started,3),'body':body[:900]}, ensure_ascii=False))
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors='replace')
-        print(json.dumps({'deployment':label,'attempt':i,'status':e.code,'seconds':round(time.perf_counter()-started,3),'final_url':e.geturl(),'body':body[:1000]}, ensure_ascii=False))
+        print(json.dumps({'deployment':label,'attempt':i,'status':e.code,'seconds':round(time.perf_counter()-started,3),'body':body[:500]}, ensure_ascii=False))
     except Exception as e:
         print(json.dumps({'deployment':label,'attempt':i,'status':'exception','seconds':round(time.perf_counter()-started,3),'error':repr(e)}, ensure_ascii=False))
 
-for i in range(1,3):
+for i in range(1,4):
     one('prod-v3', i)
-    time.sleep(1.5)
-    one('head', i)
-    if i < 2:
-        time.sleep(1.5)
+    time.sleep(1)
+    one('redundant-v4', i)
+    if i < 3:
+        time.sleep(1)
