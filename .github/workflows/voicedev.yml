@@ -53,6 +53,9 @@ jobs:
       - name: Test Database V3 natural-unit catalog
         run: node scripts/test-database-v3-catalog.mjs dist/pfc-database-v3.js dist/pfc-database-v3-catalog.js
 
+      - name: Test central MEXT Food Master registry
+        run: node scripts/test-food-master-mext-registry.mjs dist/pfc-food-master-mext-registry.js dist/pfc-database-v3.js dist/pfc-database-v3-catalog.js
+
       - name: Validate mirror safety and PWA essentials
         shell: bash
         run: |
@@ -71,6 +74,7 @@ jobs:
           test -f dist/pfc-model-selector-bridge-v23.js
           test -f dist/pfc-database-v3.js
           test -f dist/pfc-database-v3-catalog.js
+          test -f dist/pfc-food-master-mext-registry.js
           test -f dist/pfc-database-v3-manual.js
           test -f dist/pfc-input-v25.js
           test -f dist/pfc-input-v25.css
@@ -90,6 +94,7 @@ jobs:
           node --check dist/pfc-model-selector-bridge-v23.js
           node --check dist/pfc-database-v3.js
           node --check dist/pfc-database-v3-catalog.js
+          node --check dist/pfc-food-master-mext-registry.js
           node --check dist/pfc-database-v3-manual.js
           node --check dist/pfc-input-v25.js
           grep -q 'PFC Mirror' dist/manifest.json
@@ -110,6 +115,7 @@ jobs:
           grep -q 'pfc-model-selector-bridge-v23.js' dist/index.html
           grep -q 'pfc-database-v3.js' dist/index.html
           grep -q 'pfc-database-v3-catalog.js' dist/index.html
+          grep -q 'pfc-food-master-mext-registry.js?v=' dist/index.html
           grep -q 'pfc-database-v3-manual.js' dist/index.html
           grep -q 'pfc-input-v25.js' dist/index.html
           grep -q 'pfc-input-v25.css' dist/index.html
@@ -132,11 +138,15 @@ jobs:
           grep -q 'multiplierFor' dist/pfc-database-v3.js
           grep -q 'MIGRATION_MARKER' dist/pfc-database-v3.js
           grep -q '__PFC_DB_V3_CATALOG__' dist/pfc-database-v3-catalog.js
-          grep -q "VERSION = '3.1.0'" dist/pfc-database-v3-catalog.js
+          grep -q "VERSION = '3.1.2'" dist/pfc-database-v3-catalog.js
+          grep -q 'provenanceSchema' dist/pfc-database-v3-catalog.js
           grep -q 'BUNDLE_COUNT_BASES' dist/pfc-database-v3-catalog.js
           grep -q 'MEAL_AS_ONE_SERVING' dist/pfc-database-v3-catalog.js
           grep -q 'maffRiceServingGuide' dist/pfc-database-v3-catalog.js
           grep -q 'maffEggStandard' dist/pfc-database-v3-catalog.js
+          grep -q '__PFC_FOOD_MASTER_MEXT_REGISTRY__' dist/pfc-food-master-mext-registry.js
+          grep -q "VERSION = '4.0.0'" dist/pfc-food-master-mext-registry.js
+          grep -q 'REGISTRY_DATA_START' dist/pfc-food-master-mext-registry.js
           grep -q '__PFC_DB_V3_MANUAL__' dist/pfc-database-v3-manual.js
           grep -q 'unitAwareButtons: true' dist/pfc-database-v3-manual.js
           grep -q 'storedKcalScaling: true' dist/pfc-database-v3-manual.js
@@ -198,6 +208,9 @@ jobs:
 
       - name: Test Database V3 natural-unit catalog
         run: node scripts/test-database-v3-catalog.mjs dist/pfc-database-v3.js dist/pfc-database-v3-catalog.js
+
+      - name: Test central MEXT Food Master registry
+        run: node scripts/test-food-master-mext-registry.mjs dist/pfc-food-master-mext-registry.js dist/pfc-database-v3.js dist/pfc-database-v3-catalog.js
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
