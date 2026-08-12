@@ -44,6 +44,9 @@ jobs:
       - name: Apply trainer AI and mirror overlays
         run: node scripts/apply-trainer-avatar.mjs
 
+      - name: Test Database V3 scaling semantics
+        run: node scripts/test-database-v3.mjs dist/pfc-database-v3.js
+
       - name: Validate mirror safety and PWA essentials
         shell: bash
         run: |
@@ -60,6 +63,8 @@ jobs:
           test -f dist/pfc-dummy-v22.js
           test -f dist/pfc-model-selector-v23.js
           test -f dist/pfc-model-selector-bridge-v23.js
+          test -f dist/pfc-database-v3.js
+          test -f dist/pfc-database-v3-manual.js
           test -f dist/pfc-input-v25.js
           test -f dist/pfc-input-v25.css
           test ! -f dist/pfc-input-v24.js
@@ -76,6 +81,8 @@ jobs:
           node --check dist/pfc-dummy-v22.js
           node --check dist/pfc-model-selector-v23.js
           node --check dist/pfc-model-selector-bridge-v23.js
+          node --check dist/pfc-database-v3.js
+          node --check dist/pfc-database-v3-manual.js
           node --check dist/pfc-input-v25.js
           grep -q 'PFC Mirror' dist/manifest.json
           grep -q '#22a06b' dist/manifest.json
@@ -93,6 +100,8 @@ jobs:
           grep -q 'pfc-dummy-v22.js' dist/index.html
           grep -q 'pfc-model-selector-v23.js' dist/index.html
           grep -q 'pfc-model-selector-bridge-v23.js' dist/index.html
+          grep -q 'pfc-database-v3.js' dist/index.html
+          grep -q 'pfc-database-v3-manual.js' dist/index.html
           grep -q 'pfc-input-v25.js' dist/index.html
           grep -q 'pfc-input-v25.css' dist/index.html
           ! grep -q 'pfc-input-v24' dist/index.html
@@ -108,11 +117,21 @@ jobs:
           grep -q '上限を見る' dist/pfc-model-selector-v23.js
           grep -q '__PFC_MODEL_SELECTOR_BRIDGE_V23__' dist/pfc-model-selector-bridge-v23.js
           grep -q 'directModelIds: true' dist/pfc-model-selector-bridge-v23.js
+          grep -q '__PFC_DB_V3__' dist/pfc-database-v3.js
+          grep -q "VERSION = '3.0.0'" dist/pfc-database-v3.js
+          grep -q 'nutritionBasis' dist/pfc-database-v3.js
+          grep -q 'multiplierFor' dist/pfc-database-v3.js
+          grep -q 'MIGRATION_MARKER' dist/pfc-database-v3.js
+          grep -q '__PFC_DB_V3_MANUAL__' dist/pfc-database-v3-manual.js
+          grep -q 'unitAwareButtons: true' dist/pfc-database-v3-manual.js
+          grep -q 'storedKcalScaling: true' dist/pfc-database-v3-manual.js
+          grep -q 'explicitAlcoholOnly: true' dist/pfc-database-v3-manual.js
           grep -q '__PFC_INPUT_V25__' dist/pfc-input-v25.js
-          grep -q "VERSION = '2.5.0'" dist/pfc-input-v25.js
+          grep -q "VERSION = '2.5.1'" dist/pfc-input-v25.js
           grep -q 'visibleSmartPanel: false' dist/pfc-input-v25.js
           grep -q 'quickStepper: true' dist/pfc-input-v25.js
           grep -q 'smartCommandSearch: true' dist/pfc-input-v25.js
+          grep -q 'databaseV3Aware' dist/pfc-input-v25.js
           grep -q '.v25-stepper' dist/pfc-input-v25.css
           grep -q '.v25-command-hit' dist/pfc-input-v25.css
           grep -q '.btn-voice-main' dist/pfc-v21.css
@@ -155,6 +174,9 @@ jobs:
 
       - name: Apply trainer AI and mirror overlays
         run: node scripts/apply-trainer-avatar.mjs
+
+      - name: Test Database V3 scaling semantics
+        run: node scripts/test-database-v3.mjs dist/pfc-database-v3.js
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
