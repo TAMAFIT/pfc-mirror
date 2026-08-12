@@ -3,12 +3,34 @@ import importlib.util
 import json
 import re
 import sys
+import urllib.parse
 from pathlib import Path
 
 SCRIPT = Path(__file__).with_name('mext-reconcile.py')
 spec = importlib.util.spec_from_file_location('mext_reconcile_core', SCRIPT)
 core = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(core)
+
+
+def discover_main_workbook(page=core.MEXT_PAGE):
+    body, _ = core.fetch_bytes(page)
+    parser = core.Links()
+    parser.feed(body.decode('utf-8', 'replace'))
+    candidates = []
+    for href, label in parser.links:
+        if not href:
+            continue
+        url = urllib.parse.urljoin(page, href)
+        if not url.lower().endswith(('.xlsx', '.xls')):
+            continue
+        normalized = re.sub(r'\s+', '', label).lstrip('・･')
+        # Only the plain main-table link is accepted. This deliberately excludes
+        # amino-acid/fatty-acid/carbohydrate tables such as 第2章本表（データ）.
+        if normalized == '第2章（データ）':
+            candidates.append((url, label))
+    if len(candidates) != 1:
+        raise RuntimeError(f'Expected exactly one MEXT main-table workbook link, found {len(candidates)}: {candidates}')
+    return candidates[0]
 
 
 def pick_columns_by_identifier(workbook):
@@ -36,10 +58,6 @@ def pick_columns_by_identifier(workbook):
 
         food = pick(lambda t, v: 300 if '食品番号' in t else 0)
         name = pick(lambda t, v: 300 if '食品名' in t else 0)
-
-        # MEXT workbook component identifiers are the stable machine keys. Energy
-        # uses the same ENERC component with separate kJ/kcal unit columns, so
-        # the unit is part of the key. PROT/FAT identifiers can carry suffixes.
         kcal = pick(lambda t, v: 1200 if has_code(v, r'ENERC(?:[_-].*)?') and has_unit(v, r'KCAL(?:/100G)?') else 0)
         protein = pick(lambda t, v: 1100 if has_code(v, r'PROT(?:[-_].*)?') and has_unit(v, r'G/100G') else 0)
         fat = pick(lambda t, v: 1100 if has_code(v, r'FAT(?:[-_].*)?') and has_unit(v, r'G/100G') else 0)
@@ -65,8 +83,8 @@ def pick_columns_by_identifier(workbook):
         concise = {}
         for ws in workbook.worksheets[:2]:
             rows = []
-            for col in range(1, min(ws.max_column, 40) + 1):
-                vals = [core.text(ws.cell(r, col).value) for r in range(1, min(ws.max_row, 6) + 1)]
+            for col in range(1, min(ws.max_column, 50) + 1):
+                vals = [core.text(ws.cell(r, col).value) for r in range(1, min(ws.max_row, 7) + 1)]
                 if any(vals):
                     rows.append({'col': col, 'header': vals})
             concise[ws.title] = rows
@@ -76,6 +94,7 @@ def pick_columns_by_identifier(workbook):
     return best[1], best[2]
 
 
+core.discover_workbook = discover_main_workbook
 core.pick_columns = pick_columns_by_identifier
 
 if __name__ == '__main__':
