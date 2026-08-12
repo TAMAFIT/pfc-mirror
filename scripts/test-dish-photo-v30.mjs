@@ -2,14 +2,17 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const file = process.argv[2];
-if (!file) throw new Error('dish photo v3.6 path required');
+if (!file) throw new Error('dish photo v3.8 path required');
 const source = fs.readFileSync(file,'utf8');
 for (const marker of [
-  "VERSION = '3.6.0'",
+  "VERSION = '3.8.0'",
   "MODEL = 'gemini-3.5-flash-lite'",
   "THINKING_LEVEL = 'minimal'",
-  'MAX_SIDE = 1024',
-  'REQUEST_TIMEOUT_MS = 25000',
+  'MAX_SIDE = 512',
+  'JPEG_QUALITY = 0.62',
+  'REQUEST_TIMEOUT_MS = 15000',
+  'MIN_REQUEST_INTERVAL_MS = 5000',
+  'RATE_LIMIT_RETRY_MS = 8000',
   'nutritionFromAI:false',
   'identityOnly:true',
   'conservativeVisual:true',
@@ -22,6 +25,11 @@ for (const marker of [
   'latencyOptimized:true',
   'structuredJson:true',
   "mediaResolution:'MEDIA_RESOLUTION_LOW'",
+  'imageTransportOptimized:true',
+  'rateLimitQueue:true',
+  'minRequestIntervalMs:MIN_REQUEST_INTERVAL_MS',
+  'rateLimitRetryOnly:true',
+  'rateLimitRetryMs:RATE_LIMIT_RETRY_MS',
   'autoRetry:false',
   'retryTransient:false',
   'cameraRoll:true',
@@ -31,12 +39,14 @@ for (const marker of [
   'buildRecord',
   'thinkingConfig',
   'maxOutputTokens:768',
-  "responseMimeType:'application/json'"
+  "responseMimeType:'application/json'",
+  'requestQueue.then(run, run)',
+  'Only an explicit 429 gets one paced retry'
 ]) {
   if (!source.includes(marker)) throw new Error(`missing marker: ${marker}`);
 }
 for (const forbidden of ['@zxing/browser','tesseract.js','Open Food Facts','label-ocr','scan-v28-barcode']) {
-  if (source.includes(forbidden)) throw new Error(`removed scan feature leaked into v3.6: ${forbidden}`);
+  if (source.includes(forbidden)) throw new Error(`removed scan feature leaked into v3.8: ${forbidden}`);
 }
 
 const searchRows = [
@@ -63,32 +73,36 @@ const window = {
   __PFC_DB_V3__: { get(index){ return searchRows[index]?.meta || null; } }
 };
 const document = { readyState:'loading', addEventListener(){}, getElementById(){return null;} };
-const context = { window, document, console, setTimeout, clearTimeout, AbortController, URL, Image:function(){}, fetch:async()=>{throw new Error('not used');}, Promise };
+const context = { window, document, console, setTimeout, clearTimeout, AbortController, URL, Image:function(){}, fetch:async()=>{throw new Error('not used');}, Promise, Date };
 vm.createContext(context);
 vm.runInContext(source, context);
 const api = window.__PFC_DISH_PHOTO_V30__;
-if (!api || api.version !== '3.6.0') throw new Error('v3.6 API missing');
-if (api.model !== 'gemini-3.5-flash-lite' || api.thinkingLevel !== 'minimal' || api.nutritionFromAI !== false || !api.conservativeVisual) throw new Error('v3.6 model/safety invariants failed');
-if (api.requestTimeoutMs !== 25000 || api.imageMaxSide !== 1024 || Math.abs(api.jpegQuality - 0.8) > 1e-9) throw new Error('v3.6 request/image invariants failed');
-if (!api.latencyOptimized || !api.structuredJson || api.mediaResolution !== 'MEDIA_RESOLUTION_LOW' || api.autoRetry !== false || api.retryTransient !== false) throw new Error('v3.6 low-media single-request markers failed');
-if (!api.strictSpecificityGuard || api.aiAmountAutoApplied !== false || api.aiVariantFlagsTrusted !== false || !api.requiresUserAmount) throw new Error('v3.6 specificity/confirmation invariants failed');
+if (!api || api.version !== '3.8.0') throw new Error('v3.8 API missing');
+if (api.model !== 'gemini-3.5-flash-lite' || api.thinkingLevel !== 'minimal' || api.nutritionFromAI !== false || !api.conservativeVisual) throw new Error('v3.8 model/safety invariants failed');
+if (api.requestTimeoutMs !== 15000 || api.imageMaxSide !== 512 || Math.abs(api.jpegQuality - 0.62) > 1e-9) throw new Error('v3.8 request/image invariants failed');
+if (!api.latencyOptimized || !api.structuredJson || api.mediaResolution !== 'MEDIA_RESOLUTION_LOW') throw new Error('v3.8 low-media markers failed');
+if (!api.imageTransportOptimized || !api.rateLimitQueue || api.minRequestIntervalMs !== 5000 || !api.rateLimitRetryOnly || api.rateLimitRetryMs !== 8000) throw new Error('v3.8 RPM pacing markers failed');
+if (api.autoRetry !== false || api.retryTransient !== false) throw new Error('v3.8 must not broadly retry transient failures');
+if (!api.strictSpecificityGuard || api.aiAmountAutoApplied !== false || api.aiVariantFlagsTrusted !== false || !api.requiresUserAmount) throw new Error('v3.8 specificity/confirmation invariants failed');
 
 const payload = api.buildRequestPayload('abc123');
-if (payload.modelPreference !== 'gemini-3.5-flash-lite' || payload.imageBase64 !== 'abc123') throw new Error('v3.6 payload model/image failed');
-if (payload.generationConfig?.thinkingConfig?.thinkingLevel !== 'minimal') throw new Error('v3.6 must force minimal thinking');
-if (payload.generationConfig?.maxOutputTokens !== 768) throw new Error('v3.6 output token cap missing');
-if (payload.generationConfig?.responseMimeType !== 'application/json') throw new Error('v3.6 structured JSON response MIME missing');
-if (payload.generationConfig?.mediaResolution !== 'MEDIA_RESOLUTION_LOW') throw new Error('v3.6 low media resolution missing');
+if (payload.modelPreference !== 'gemini-3.5-flash-lite' || payload.imageBase64 !== 'abc123') throw new Error('v3.8 payload model/image failed');
+if (payload.generationConfig?.thinkingConfig?.thinkingLevel !== 'minimal') throw new Error('v3.8 must force minimal thinking');
+if (payload.generationConfig?.maxOutputTokens !== 768) throw new Error('v3.8 output token cap missing');
+if (payload.generationConfig?.responseMimeType !== 'application/json') throw new Error('v3.8 structured JSON response MIME missing');
+if (payload.generationConfig?.mediaResolution !== 'MEDIA_RESOLUTION_LOW') throw new Error('v3.8 low media resolution missing');
 const prompt = String(api.identityPrompt?.() || '');
-if (!prompt.includes('具が見えないおにぎりは「おにぎり」とだけ書く')) throw new Error('v3.6 conservative generic-food rule missing');
-if (!prompt.includes('少しでも曖昧ならnullを優先する')) throw new Error('v3.6 conservative counting rule missing');
-if (prompt.includes('visibleCount":3') || prompt.includes('visibleCount":4')) throw new Error('v3.6 prompt must not leak benchmark-specific counts');
+if (!prompt.includes('具が見えないおにぎりは「おにぎり」とだけ書く')) throw new Error('v3.8 conservative generic-food rule missing');
+if (!prompt.includes('少しでも曖昧ならnullを優先する')) throw new Error('v3.8 conservative counting rule missing');
+if (prompt.includes('visibleCount":3') || prompt.includes('visibleCount":4')) throw new Error('v3.8 prompt must not leak benchmark-specific counts');
 
 const joined = api.extractAiText({candidates:[{content:{parts:[{text:'{"foods":'},{text:'[]}'}]}}]});
-if (joined !== '{"foods":[]}') throw new Error('v3.6 must join text parts');
-const upstream = api.classifyUpstreamText('GASエラー: AI API HTTP 503: unavailable');
-if (!upstream || !upstream.upstream) throw new Error('v3.6 must expose upstream error text');
-if (api.classifyUpstreamText('{"foods":[]}') !== null) throw new Error('v3.6 valid JSON must not be classified as upstream error');
+if (joined !== '{"foods":[]}') throw new Error('v3.8 must join text parts');
+const rateLimit = api.classifyUpstreamText('GASエラー: AI API HTTP 429: RESOURCE_EXHAUSTED');
+if (!rateLimit || !rateLimit.upstream || !rateLimit.rateLimited) throw new Error('v3.8 must classify explicit 429 for the one paced retry');
+const unavailable = api.classifyUpstreamText('GASエラー: AI API HTTP 503: unavailable');
+if (!unavailable || !unavailable.upstream || unavailable.rateLimited) throw new Error('v3.8 must not classify 503 as rate-limit retry');
+if (api.classifyUpstreamText('{"foods":[]}') !== null) throw new Error('v3.8 valid JSON must not be classified as upstream error');
 
 const parsed = api.parseIdentityResponse('```json\n{"dishName":"お弁当","foods":[{"name":"おにぎり","visibleCount":3,"countCertain":true,"variantVisible":true},{"name":"にんじん","ambiguity":"千切りと花形型抜き"},{"name":"レタス"},{"name":"鶏肉料理","visibleCount":2},{"name":"卵焼き","visibleCount":2},{"name":"漬物"},{"name":"紫キャベツ"}]}\n```');
 if (!parsed || parsed.foods.length !== 7) throw new Error('real-device regression JSON parsing failed');
@@ -115,9 +129,9 @@ if (!carrot.match || carrot.match.name !== '人参' || carrot.amount !== null) t
 const carrotKatakana = api.resolveFoods({foods:[{name:'ニンジン'}]})[0];
 if (!carrotKatakana.match || carrotKatakana.match.name !== '人参') throw new Error('kana-folded curated alias should resolve');
 const lettuce = api.resolveFoods({foods:[parsed.foods[2]]})[0];
-if (!lettuce.match || lettuce.amount !== null) throw new Error('Food Master 50g default must not auto-fill from photo');
+if (!lettuce.match || lettuce.amount !== null) throw new Error('Food Master default amount must not auto-fill from photo');
 
 const karaage = api.resolveFoods({foods:[{name:'唐揚げ',visibleCount:2}]})[0];
 if (!karaage.match || karaage.amount !== null || karaage.countSuggestion !== null || karaage.countApplied) throw new Error('gram foods must remain user-entered even when visibleCount exists');
 
-console.log('Dish photo v3.6 strict-specificity low-media regression tests passed.');
+console.log('Dish photo v3.8 RPM-safe strict-specificity regression tests passed.');
