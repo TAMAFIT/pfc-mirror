@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "5.0.0",
+  "principles": [
+    "Nutrition authority and serving-unit authority are separate concerns.",
+    "Never use a guessed piece-to-gram conversion as high-confidence nutrition provenance.",
+    "General foods prefer MEXT; branded packaged foods prefer manufacturer/label; chain menus prefer restaurant official data.",
+    "Generic composite dishes remain recipe estimates unless an exact official product/menu identity exists.",
+    "Runtime must remain local-first; provider checks happen in maintenance CI, not during normal app interaction."
+  ],
+  "providers": {
+    "mext": { "confidenceCeiling": "high", "maintenance": "scheduled-official-reconcile" },
+    "manufacturer": { "confidenceCeiling": "high", "maintenance": "official-product-page-or-label" },
+    "restaurant": { "confidenceCeiling": "high", "maintenance": "official-menu-nutrition" },
+    "official-standard": { "confidenceCeiling": "high", "maintenance": "government-or-industry-standard" },
+    "recipe-estimate": { "confidenceCeiling": "medium", "maintenance": "curated-recipe-model" },
+    "serving-estimate": { "confidenceCeiling": "low", "maintenance": "explicit-estimate" },
+    "user-label": { "confidenceCeiling": "high", "maintenance": "user-entered-package-label" }
+  },
+  "routeOrder": [
+    "existing-official-source",
+    "manufacturer-or-product-label",
+    "restaurant-official",
+    "mext-general-food",
+    "official-serving-standard",
+    "recipe-estimate",
+    "serving-estimate"
+  ]
+}
