@@ -39,7 +39,7 @@ const expected = {
   'まだら(生)': { itemNo: '10205', p: 17.6, f: 0.2, c: 0.1, kcal: 72 },
   'スイートコーン(生)': { itemNo: '06175', p: 3.6, f: 1.7, c: 16.8, kcal: 89 },
   'ズッキーニ': { itemNo: '06116', p: 1.3, f: 0.1, c: 2.8, kcal: 16 },
-  'マンゴー(生)': { itemNo: '07132', p: 0.6, f: 0.1, c: 15.7, kcal: 68 },
+  'マンゴー(生)': { itemNo: '07132', p: 0.6, f: 0.1, c: 16.9, kcal: 68 },
   'ブルーベリー(生)': { itemNo: '07124', p: 0.5, f: 0.1, c: 12.9, kcal: 48 },
   'ネーブルオレンジ(生)': { itemNo: '07040', p: 0.9, f: 0.1, c: 11.8, kcal: 48 }
 };
@@ -57,7 +57,7 @@ for (const [name, e] of Object.entries(expected)) {
 assert.match(byName('まだら(生)').servingSource.note, /1切/);
 assert.match(byName('スイートコーン(生)').servingSource.note, /1本/);
 assert.match(byName('マンゴー(生)').servingSource.note, /1個/);
-assert.equal(context.__PFC_DB_V3_VERIFIED_B5__.version, '3.5.0');
+assert.equal(context.__PFC_DB_V3_VERIFIED_B5__.version, '3.5.1');
 assert.equal(context.__PFC_DB_V3_VERIFIED_B5__.names.length, 6);
 assert.equal(context.__PFC_DB_V3_CATALOG__.verifiedSourcesApplied, 21);
 console.log('Database V3 B5 verified-food tests passed.');

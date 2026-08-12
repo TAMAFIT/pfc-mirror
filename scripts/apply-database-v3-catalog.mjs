@@ -35,7 +35,7 @@ if (!html.includes('pfc-database-v3-verified.js')) {
 if (!html.includes('pfc-database-v3-verified-b5.js')) {
   const coreTag = '    <script src="pfc-database-v3.js?v=300"></script>';
   if (!html.includes(coreTag)) throw new Error('Database V3 core script tag was not found for B5.');
-  html = html.replace(coreTag, `    <script src="pfc-database-v3-verified-b5.js?v=350"></script>\n${coreTag}`);
+  html = html.replace(coreTag, `    <script src="pfc-database-v3-verified-b5.js?v=351"></script>\n${coreTag}`);
 }
 if (!html.includes('pfc-database-v3-catalog.js')) {
   const manualTag = '    <script src="pfc-database-v3-manual.js?v=300"></script>';
@@ -64,7 +64,7 @@ for (const marker of [
 }
 const verifiedB5 = fs.readFileSync(verifiedB5Output, 'utf8');
 for (const marker of [
-  '__PFC_DB_V3_VERIFIED_B5__', "VERSION = '3.5.0'", 'まだら(生)', 'スイートコーン(生)',
+  '__PFC_DB_V3_VERIFIED_B5__', "VERSION = '3.5.1'", 'まだら(生)', 'スイートコーン(生)',
   'ズッキーニ', 'マンゴー(生)', 'ブルーベリー(生)', 'ネーブルオレンジ(生)'
 ]) {
   if (!verifiedB5.includes(marker)) throw new Error(`Database V3 B5 marker missing: ${marker}`);
@@ -96,7 +96,7 @@ if (!(v21Pos >= 0 && verifiedPos > v21Pos && verifiedB5Pos > verifiedPos && core
   throw new Error('Database V3 script ordering is invalid.');
 }
 if (!finalHtml.includes('pfc-database-v3-verified.js?v=340')) throw new Error('Database V3 verified cache version is stale.');
-if (!finalHtml.includes('pfc-database-v3-verified-b5.js?v=350')) throw new Error('Database V3 B5 cache version is stale.');
+if (!finalHtml.includes('pfc-database-v3-verified-b5.js?v=351')) throw new Error('Database V3 B5 cache version is stale.');
 if (!finalHtml.includes('pfc-database-v3-multiunit.js?v=360')) throw new Error('Database V3 multi-unit cache version is stale.');
 if (!finalHtml.includes('pfc-database-v3-search.js?v=370')) throw new Error('Database V3 search cache version is stale.');
 
