@@ -77,7 +77,7 @@ for (const marker of ['__PFC_DB_V3_MULTIUNIT__', "VERSION = '3.6.0'", 'scaleInpu
   if (!multiunit.includes(marker)) throw new Error(`Database V3 multi-unit marker missing: ${marker}`);
 }
 const search = fs.readFileSync(searchOutput, 'utf8');
-for (const marker of ['__PFC_DB_V3_SEARCH__', "VERSION = '3.7.0'", 'canonicalItems', 'genericTags', 'CATEGORY_QUERY', 'duplicateCount']) {
+for (const marker of ['__PFC_DB_V3_SEARCH__', "VERSION = '3.7.0'", 'canonicalItems', 'Generic tags', 'CATEGORY_QUERY', 'duplicateCount']) {
   if (!search.includes(marker)) throw new Error(`Database V3 search marker missing: ${marker}`);
 }
 
