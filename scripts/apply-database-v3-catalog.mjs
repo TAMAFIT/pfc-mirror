@@ -8,6 +8,8 @@ const verifiedSource = path.join(root, 'overrides', 'pfc-database-v3-verified.js
 const verifiedOutput = path.join(dist, 'pfc-database-v3-verified.js');
 const verifiedB5Source = path.join(root, 'overrides', 'pfc-database-v3-verified-b5.js');
 const verifiedB5Output = path.join(dist, 'pfc-database-v3-verified-b5.js');
+const promotedSource = path.join(root, 'overrides', 'pfc-database-v3-mext-promoted.js');
+const promotedOutput = path.join(dist, 'pfc-database-v3-mext-promoted.js');
 const catalogSource = path.join(root, 'overrides', 'pfc-database-v3-catalog.js');
 const catalogOutput = path.join(dist, 'pfc-database-v3-catalog.js');
 const multiunitSource = path.join(root, 'overrides', 'pfc-database-v3-multiunit.js');
@@ -16,12 +18,13 @@ const searchSource = path.join(root, 'overrides', 'pfc-database-v3-search.js');
 const searchOutput = path.join(dist, 'pfc-database-v3-search.js');
 const htmlPath = path.join(dist, 'index.html');
 
-for (const required of [verifiedSource, verifiedB5Source, catalogSource, multiunitSource, searchSource, htmlPath]) {
+for (const required of [verifiedSource, verifiedB5Source, promotedSource, catalogSource, multiunitSource, searchSource, htmlPath]) {
   if (!fs.existsSync(required)) throw new Error(`Database V3 catalog dependency missing: ${required}`);
 }
 
 fs.copyFileSync(verifiedSource, verifiedOutput);
 fs.copyFileSync(verifiedB5Source, verifiedB5Output);
+fs.copyFileSync(promotedSource, promotedOutput);
 fs.copyFileSync(catalogSource, catalogOutput);
 fs.copyFileSync(multiunitSource, multiunitOutput);
 fs.copyFileSync(searchSource, searchOutput);
@@ -37,10 +40,15 @@ if (!html.includes('pfc-database-v3-verified-b5.js')) {
   if (!html.includes(coreTag)) throw new Error('Database V3 core script tag was not found for B5.');
   html = html.replace(coreTag, `    <script src="pfc-database-v3-verified-b5.js?v=351"></script>\n${coreTag}`);
 }
+if (!html.includes('pfc-database-v3-mext-promoted.js')) {
+  const coreTag = '    <script src="pfc-database-v3.js?v=300"></script>';
+  if (!html.includes(coreTag)) throw new Error('Database V3 core script tag was not found for MEXT promotion.');
+  html = html.replace(coreTag, `    <script src="pfc-database-v3-mext-promoted.js?v=380"></script>\n${coreTag}`);
+}
 if (!html.includes('pfc-database-v3-catalog.js')) {
   const manualTag = '    <script src="pfc-database-v3-manual.js?v=300"></script>';
   if (!html.includes(manualTag)) throw new Error('Database V3 manual script tag was not found.');
-  html = html.replace(manualTag, `    <script src="pfc-database-v3-catalog.js?v=311"></script>\n${manualTag}`);
+  html = html.replace(manualTag, `    <script src="pfc-database-v3-catalog.js?v=312"></script>\n${manualTag}`);
 }
 if (!html.includes('pfc-database-v3-multiunit.js')) {
   const manualTag = '    <script src="pfc-database-v3-manual.js?v=300"></script>';
@@ -69,8 +77,15 @@ for (const marker of [
 ]) {
   if (!verifiedB5.includes(marker)) throw new Error(`Database V3 B5 marker missing: ${marker}`);
 }
+const promoted = fs.readFileSync(promotedOutput, 'utf8');
+for (const marker of [
+  '__PFC_DB_V3_MEXT_PROMOTED__', "VERSION = '3.8.0'", 'mext:01088', 'mext:11220',
+  '白米', 'オートミール', 'パスタ(乾麺)', '鶏むね(皮なし)', '豚ひき肉', 'うなぎ(蒲焼)', 'きゅうり', 'カッテージチーズ'
+]) {
+  if (!promoted.includes(marker)) throw new Error(`Database V3 MEXT promoted marker missing: ${marker}`);
+}
 const catalog = fs.readFileSync(catalogOutput, 'utf8');
-for (const marker of ['__PFC_DB_V3_CATALOG__', "VERSION = '3.1.1'", 'BUNDLE_COUNT_BASES', 'MEAL_AS_ONE_SERVING', 'maffRiceServingGuide', 'maffEggStandard', 'applyVerifiedSources']) {
+for (const marker of ['__PFC_DB_V3_CATALOG__', "VERSION = '3.1.2'", 'BUNDLE_COUNT_BASES', 'MEAL_AS_ONE_SERVING', 'maffRiceServingGuide', 'maffEggStandard', 'applyVerifiedSources', 'provenanceSchema']) {
   if (!catalog.includes(marker)) throw new Error(`Database V3 catalog marker missing: ${marker}`);
 }
 const multiunit = fs.readFileSync(multiunitOutput, 'utf8');
@@ -86,17 +101,20 @@ const finalHtml = fs.readFileSync(htmlPath, 'utf8');
 const v21Pos = finalHtml.indexOf('pfc-v21.js');
 const verifiedPos = finalHtml.indexOf('pfc-database-v3-verified.js');
 const verifiedB5Pos = finalHtml.indexOf('pfc-database-v3-verified-b5.js');
+const promotedPos = finalHtml.indexOf('pfc-database-v3-mext-promoted.js');
 const corePos = finalHtml.indexOf('pfc-database-v3.js');
 const catalogPos = finalHtml.indexOf('pfc-database-v3-catalog.js');
 const manualPos = finalHtml.indexOf('pfc-database-v3-manual.js');
 const multiunitPos = finalHtml.indexOf('pfc-database-v3-multiunit.js');
 const searchPos = finalHtml.indexOf('pfc-database-v3-search.js');
 const inputPos = finalHtml.indexOf('pfc-input-v25.js');
-if (!(v21Pos >= 0 && verifiedPos > v21Pos && verifiedB5Pos > verifiedPos && corePos > verifiedB5Pos && catalogPos > corePos && manualPos > catalogPos && multiunitPos > manualPos && searchPos > multiunitPos && inputPos > searchPos)) {
+if (!(v21Pos >= 0 && verifiedPos > v21Pos && verifiedB5Pos > verifiedPos && promotedPos > verifiedB5Pos && corePos > promotedPos && catalogPos > corePos && manualPos > catalogPos && multiunitPos > manualPos && searchPos > multiunitPos && inputPos > searchPos)) {
   throw new Error('Database V3 script ordering is invalid.');
 }
 if (!finalHtml.includes('pfc-database-v3-verified.js?v=340')) throw new Error('Database V3 verified cache version is stale.');
 if (!finalHtml.includes('pfc-database-v3-verified-b5.js?v=351')) throw new Error('Database V3 B5 cache version is stale.');
+if (!finalHtml.includes('pfc-database-v3-mext-promoted.js?v=380')) throw new Error('Database V3 MEXT promoted cache version is stale.');
+if (!finalHtml.includes('pfc-database-v3-catalog.js?v=312')) throw new Error('Database V3 catalog cache version is stale.');
 if (!finalHtml.includes('pfc-database-v3-multiunit.js?v=360')) throw new Error('Database V3 multi-unit cache version is stale.');
 if (!finalHtml.includes('pfc-database-v3-search.js?v=370')) throw new Error('Database V3 search cache version is stale.');
 
@@ -105,4 +123,4 @@ if (!fs.existsSync(runtimeApply)) throw new Error(`Food Master runtime apply scr
 const runtimeResult = spawnSync(process.execPath, [runtimeApply], { stdio: 'inherit' });
 if (runtimeResult.status !== 0) throw new Error('Food Master runtime build step failed');
 
-console.log('Database V3 verified foods B1-B5 + natural-unit catalog + multi-unit engine + canonical search + Food Master runtime applied.');
+console.log('Database V3 verified foods B1-B5 + MEXT promotion D2 + provenance + natural-unit catalog + multi-unit engine + canonical search + Food Master runtime applied.');
