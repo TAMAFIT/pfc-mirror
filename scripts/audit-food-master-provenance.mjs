@@ -30,8 +30,8 @@ const report = {
 };
 fs.writeFileSync(output,JSON.stringify(report,null,2)+'\n');
 assert.equal(master.markers?.mextRegistry,'4.0.0','central MEXT registry must be active');
-assert.equal(registryBacked.length,40,'all current MEXT foods must be controlled by the central registry');
-assert.equal(mext.length,40,'registry and effective MEXT food count must agree');
+assert.equal(registryBacked.length,46,'all current MEXT foods must be controlled by the central registry');
+assert.equal(mext.length,46,'registry and effective MEXT food count must agree');
 assert.deepEqual(report.missingCanonical,[],'MEXT foods need stable canonical IDs');
 assert.deepEqual(report.missingSourceId,[],'MEXT foods need item numbers');
 assert.deepEqual(report.missingConfidence,[],'MEXT foods need high confidence');
