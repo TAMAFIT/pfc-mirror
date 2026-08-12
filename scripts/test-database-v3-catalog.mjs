@@ -105,3 +105,9 @@ if (!fs.existsSync(b5Path)) throw new Error(`Database V3 B5 layer missing: ${b5P
 const b5Test = path.join(process.cwd(), 'scripts', 'test-database-v3-b5.mjs');
 const b5 = spawnSync(process.execPath, [b5Test, verifiedPath, b5Path, corePath, catalogPath], { stdio: 'inherit' });
 if (b5.status !== 0) throw new Error('Database V3 B5 verified-food test suite failed');
+
+const multiunitPath = path.join(path.dirname(corePath), 'pfc-database-v3-multiunit.js');
+if (!fs.existsSync(multiunitPath)) throw new Error(`Database V3 multi-unit layer missing: ${multiunitPath}`);
+const multiunitTest = path.join(process.cwd(), 'scripts', 'test-database-v3-multiunit.mjs');
+const multiunitResult = spawnSync(process.execPath, [multiunitTest, verifiedPath, corePath, catalogPath, multiunitPath], { stdio: 'inherit' });
+if (multiunitResult.status !== 0) throw new Error('Database V3 multi-unit test suite failed');
