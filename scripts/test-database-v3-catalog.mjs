@@ -117,3 +117,11 @@ if (!fs.existsSync(searchPath)) throw new Error(`Database V3 search layer missin
 const searchTest = path.join(process.cwd(), 'scripts', 'test-database-v3-search.mjs');
 const searchResult = spawnSync(process.execPath, [searchTest, verifiedPath, b5Path, corePath, catalogPath, searchPath], { stdio: 'inherit' });
 if (searchResult.status !== 0) throw new Error('Database V3 canonical search test suite failed');
+
+const runtimePath = path.join(path.dirname(corePath), 'pfc-food-master-runtime.js');
+const manifestPath = path.join(path.dirname(corePath), 'food-master-manifest.json');
+if (!fs.existsSync(runtimePath)) throw new Error(`Food Master runtime missing: ${runtimePath}`);
+if (!fs.existsSync(manifestPath)) throw new Error(`Food Master manifest missing: ${manifestPath}`);
+const runtimeTest = path.join(process.cwd(), 'scripts', 'test-food-master-runtime.mjs');
+const runtimeResult = spawnSync(process.execPath, [runtimeTest, runtimePath, manifestPath], { stdio: 'inherit' });
+if (runtimeResult.status !== 0) throw new Error('Food Master local-first runtime test suite failed');
