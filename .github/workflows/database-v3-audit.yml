@@ -41,8 +41,8 @@ jobs:
           node -e "const r=require('./database-v3-audit.json'); if(!r.totalRows || !r.categories || !r.unitFamilies) process.exit(1); console.log('legacy-audit-json-ok')"
           node - <<'NODE'
           const r=require('./database-v3-effective-audit.json');
-          if (!r.canonicalRows || r.markers?.mextRegistryVersion !== '4.0.0' || r.markers?.mextRegistryCount !== 40) process.exit(1);
-          if ((r.sourceCounts?.mext || 0) !== 40) process.exit(1);
+          if (!r.canonicalRows || r.markers?.mextRegistryVersion !== '4.0.0' || r.markers?.mextRegistryCount !== 46) process.exit(1);
+          if ((r.sourceCounts?.mext || 0) !== 46) process.exit(1);
           console.log(`effective-audit-ok canonical=${r.canonicalRows} mext=${r.sourceCounts.mext}`);
           NODE
 
