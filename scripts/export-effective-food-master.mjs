@@ -8,6 +8,7 @@ const overlays = [
   'overrides/pfc-database-v3-verified.js',
   'overrides/pfc-database-v3-verified-b5.js',
   'overrides/pfc-database-v3-mext-promoted.js',
+  'overrides/pfc-food-master-mext-registry.js',
   'overrides/pfc-database-v3.js',
   'overrides/pfc-database-v3-catalog.js',
   'overrides/pfc-database-v3-multiunit.js',
@@ -62,7 +63,7 @@ for (const item of api.items) {
   });
 }
 const payload = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   generatedAt: new Date().toISOString(),
   sourceDb,
   effectiveRows: api.items.length,
@@ -74,9 +75,10 @@ const payload = {
     primaryVerified: context.__PFC_DB_V3_VERIFIED__?.version,
     b5Verified: context.__PFC_DB_V3_VERIFIED_B5__?.version,
     mextPromoted: context.__PFC_DB_V3_MEXT_PROMOTED__?.version,
+    mextRegistry: context.__PFC_FOOD_MASTER_MEXT_REGISTRY__?.version,
     catalog: context.__PFC_DB_V3_CATALOG__?.version
   },
   items
 };
 fs.writeFileSync(outPath, JSON.stringify(payload,null,2)+'\n');
-console.log(`FOOD_MASTER_EXPORT canonical=${items.length} effective=${api.items.length} mext=${items.filter(x => x.source?.kind === 'mext').length} output=${outPath}`);
+console.log(`FOOD_MASTER_EXPORT canonical=${items.length} effective=${api.items.length} mext=${items.filter(x => x.source?.kind === 'mext').length} registry=${context.__PFC_FOOD_MASTER_MEXT_REGISTRY__?.count || 0} output=${outPath}`);
