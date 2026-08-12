@@ -5,13 +5,13 @@
   const VERSION = '3.7.0';
 
   const CATEGORY_QUERY = {
-    '米': { categories: ['staples'], prefer: ['白米','玄米','雑穀米','麦ご飯','パックご飯'] },
-    'こめ': { categories: ['staples'], prefer: ['白米','玄米','雑穀米','麦ご飯','パックご飯'] },
-    'ごはん': { categories: ['staples'], prefer: ['白米','玄米','雑穀米','麦ご飯','パックご飯'] },
-    'パン': { categories: ['staples'], prefer: ['食パン(6枚切)','食パン(8枚切)','ロールパン','ベーグル'] },
-    'ぱん': { categories: ['staples'], prefer: ['食パン(6枚切)','食パン(8枚切)','ロールパン','ベーグル'] },
-    '麺': { categories: ['staples'], prefer: ['うどん(1玉)','そば(1玉)','パスタ(ゆで)','中華麺'] },
-    'めん': { categories: ['staples'], prefer: ['うどん(1玉)','そば(1玉)','パスタ(ゆで)','中華麺'] },
+    '米': { categories: ['staples'], nameHints: ['米','ご飯','ごはん','ライス'], prefer: ['白米','玄米','雑穀米','麦ご飯','パックご飯'] },
+    'こめ': { categories: ['staples'], nameHints: ['米','ご飯','ごはん','ライス'], prefer: ['白米','玄米','雑穀米','麦ご飯','パックご飯'] },
+    'ごはん': { categories: ['staples'], nameHints: ['米','ご飯','ごはん','ライス'], prefer: ['白米','玄米','雑穀米','麦ご飯','パックご飯'] },
+    'パン': { categories: ['staples'], nameHints: ['パン','ベーグル','クロワッサン','マフィン','トースト'], prefer: ['食パン(6枚切)','食パン(8枚切)','ロールパン','ベーグル'] },
+    'ぱん': { categories: ['staples'], nameHints: ['パン','ベーグル','クロワッサン','マフィン','トースト'], prefer: ['食パン(6枚切)','食パン(8枚切)','ロールパン','ベーグル'] },
+    '麺': { categories: ['staples'], nameHints: ['麺','うどん','そば','そうめん','パスタ','スパゲッティ','ラーメン'], prefer: ['うどん(1玉)','そば(1玉)','パスタ(ゆで)','中華麺'] },
+    'めん': { categories: ['staples'], nameHints: ['麺','うどん','そば','そうめん','パスタ','スパゲッティ','ラーメン'], prefer: ['うどん(1玉)','そば(1玉)','パスタ(ゆで)','中華麺'] },
     '肉': { categories: ['meat'], prefer: ['鶏むね(皮なし)','鶏もも(皮なし)','鶏ささみ','豚ヒレ','豚ロース(脂身無)','牛モモ(赤身)'] },
     'にく': { categories: ['meat'], prefer: ['鶏むね(皮なし)','鶏もも(皮なし)','鶏ささみ','豚ヒレ','豚ロース(脂身無)','牛モモ(赤身)'] },
     '鶏肉': { categories: ['meat'], nameHints: ['鶏','チキン'], prefer: ['鶏むね(皮なし)','鶏もも(皮なし)','鶏ささみ','鶏手羽元(皮つき)'] },
@@ -88,9 +88,9 @@
       return group.slice().sort((a, b) => {
         const sourceDiff = sourcePriority(b) - sourcePriority(a);
         if (sourceDiff) return sourceDiff;
-        const aV3 = a.duplicateOf ? 1 : 0;
-        const bV3 = b.duplicateOf ? 1 : 0;
-        if (aV3 !== bV3) return aV3 - bV3;
+        const aDuplicate = a.duplicateOf ? 1 : 0;
+        const bDuplicate = b.duplicateOf ? 1 : 0;
+        if (aDuplicate !== bDuplicate) return aDuplicate - bDuplicate;
         return a.runtimeIndex - b.runtimeIndex;
       })[0];
     });
@@ -120,6 +120,9 @@
     if (!qCompact) return 0;
     const rule = queryRule(rawQuery);
 
+    // Broad food words are category queries only. This prevents e.g. `米` from ranking `米みそ`.
+    if (rule) return categoryScore(rule, meta);
+
     const nName = normalize(meta.name);
     const cName = compact(meta.name);
     const bName = baseName(meta.name);
@@ -138,8 +141,7 @@
       else if (qCompact.length >= 2 && (a.includes(query) || ac.includes(qCompact))) score = Math.max(score, 1700);
     }
 
-    // Generic tags never act like a strong synonym. They only support deliberate broad queries.
-    if (rule) score = Math.max(score, categoryScore(rule, meta));
+    // Generic tags never act like a strong synonym. They are consumed only by CATEGORY_QUERY above.
     return score ? score + sourcePriority(meta) : 0;
   }
 
@@ -163,6 +165,7 @@
   }
 
   function search(rawQuery, limit = 12) {
+    const rule = queryRule(rawQuery);
     const dbResults = canonicalItems()
       .map(meta => {
         const score = scoreMeta(meta, rawQuery);
@@ -177,7 +180,8 @@
       })
       .filter(Boolean);
 
-    return [...myFoodMatches(rawQuery), ...dbResults]
+    const personal = rule ? [] : myFoodMatches(rawQuery);
+    return [...personal, ...dbResults]
       .sort((a, b) => b.score - a.score || String(a.name).localeCompare(String(b.name), 'ja'))
       .slice(0, Math.max(1, Number(limit) || 12));
   }
