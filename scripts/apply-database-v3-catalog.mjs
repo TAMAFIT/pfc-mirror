@@ -20,7 +20,7 @@ let html = fs.readFileSync(htmlPath, 'utf8');
 if (!html.includes('pfc-database-v3-verified.js')) {
   const coreTag = '    <script src="pfc-database-v3.js?v=300"></script>';
   if (!html.includes(coreTag)) throw new Error('Database V3 core script tag was not found.');
-  html = html.replace(coreTag, `    <script src="pfc-database-v3-verified.js?v=330"></script>\n${coreTag}`);
+  html = html.replace(coreTag, `    <script src="pfc-database-v3-verified.js?v=340"></script>\n${coreTag}`);
 }
 if (!html.includes('pfc-database-v3-catalog.js')) {
   const manualTag = '    <script src="pfc-database-v3-manual.js?v=300"></script>';
@@ -31,8 +31,9 @@ fs.writeFileSync(htmlPath, html, 'utf8');
 
 const verified = fs.readFileSync(verifiedOutput, 'utf8');
 for (const marker of [
-  '__PFC_DB_V3_VERIFIED__', "VERSION = '3.3.0'", 'こいくち醤油', '本みりん',
-  '豚肩ロース(脂身つき)', '鶏手羽元(皮つき)', 'サバ(生)', 'アジ(生)', 'ピーマン', 'なす', '白菜'
+  '__PFC_DB_V3_VERIFIED__', "VERSION = '3.4.0'", 'こいくち醤油', '本みりん',
+  '豚肩ロース(脂身つき)', '鶏手羽元(皮つき)', 'サバ(生)', 'アジ(生)',
+  'ピーマン', 'なす', '白菜', '小松菜', 'アスパラガス', 'にんにく', '長ねぎ'
 ]) {
   if (!verified.includes(marker)) throw new Error(`Database V3 verified marker missing: ${marker}`);
 }
@@ -50,5 +51,6 @@ const manualPos = finalHtml.indexOf('pfc-database-v3-manual.js');
 if (!(v21Pos >= 0 && verifiedPos > v21Pos && corePos > verifiedPos && catalogPos > corePos && manualPos > catalogPos)) {
   throw new Error('Database V3 script ordering is invalid.');
 }
+if (!finalHtml.includes('pfc-database-v3-verified.js?v=340')) throw new Error('Database V3 verified cache version is stale.');
 
 console.log('Database V3 verified foods + natural-unit catalog applied.');
