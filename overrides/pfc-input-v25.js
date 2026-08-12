@@ -2,23 +2,45 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.5.0';
+  const VERSION = '2.5.1';
 
   const fmt = value => {
     const n = Math.round(Number(value || 0) * 10) / 10;
     return Number.isInteger(n) ? String(n) : n.toFixed(1);
   };
 
+  function v3Meta(item) {
+    return item?.source === 'db' ? window.__PFC_DB_V3__?.get?.(item.i) || null : null;
+  }
+
   function getItemStep(item, amount) {
+    const meta = v3Meta(item);
+    if (meta) {
+      if (Number(meta.nutritionBasis?.amount) > 0 && Number(meta.nutritionBasis.amount) < 1 && ['count','package'].includes(meta.input?.type)) {
+        return Number(meta.nutritionBasis.amount);
+      }
+      const value = Number(meta.input?.quickStep);
+      if (Number.isFinite(value) && value > 0) return value;
+    }
     const unit = typeof getFavoriteUnit === 'function' ? String(getFavoriteUnit(item) || '') : '';
     if (unit === 'g' || /ml/i.test(unit)) return 50;
     return Number(amount) <= 1 ? 0.5 : 1;
   }
 
   function getItemMin(item) {
+    const meta = v3Meta(item);
+    const value = Number(meta?.input?.quickMin);
+    if (Number.isFinite(value) && value > 0) return value;
     const unit = typeof getFavoriteUnit === 'function' ? String(getFavoriteUnit(item) || '') : '';
     if (unit === 'g' || /ml/i.test(unit)) return 50;
     return 0.5;
+  }
+
+  function formatItemAmount(item, amount) {
+    const meta = v3Meta(item);
+    if (meta && window.__PFC_DB_V3__?.formatAmount) return window.__PFC_DB_V3__.formatAmount(meta, amount);
+    const unit = typeof getFavoriteUnit === 'function' ? String(getFavoriteUnit(item) || '') : '';
+    return `${fmt(amount)}${unit}`;
   }
 
   function rerenderFavorites() {
@@ -33,7 +55,7 @@
     const current = Number(getFavoriteAmount(item)) || 1;
     const next = Math.max(getItemMin(item), current + delta);
     const setting = getFavoriteSetting(item.source, item.i);
-    setting.amount = Math.round(next * 10) / 10;
+    setting.amount = Math.round(next * 100) / 100;
     if (typeof saveFavoriteSettings === 'function') saveFavoriteSettings();
     rerenderFavorites();
   }
@@ -50,7 +72,6 @@
       if (!item || row.querySelector('.v25-stepper')) return;
 
       const amount = Number(getFavoriteAmount(item)) || 1;
-      const unit = typeof getFavoriteUnit === 'function' ? String(getFavoriteUnit(item) || '') : '';
       const step = getItemStep(item, amount);
 
       const oldAmount = row.querySelector('.favorite-chip-main em');
@@ -60,7 +81,7 @@
       stepper.className = 'v25-stepper';
       stepper.innerHTML = `
         <button type="button" class="v25-step v25-minus" aria-label="量を減らす">−</button>
-        <button type="button" class="v25-amount" aria-label="この量で記録">${fmt(amount)}${unit}</button>
+        <button type="button" class="v25-amount" aria-label="この量で記録">${formatItemAmount(item, amount)}</button>
         <button type="button" class="v25-step v25-plus" aria-label="量を増やす">＋</button>`;
 
       const minus = stepper.querySelector('.v25-minus');
@@ -95,14 +116,33 @@
     requestAnimationFrame(decorateQuickCards);
   }
 
+  function normalizeTypedUnit(value) {
+    const raw = String(value || '').normalize('NFKC').toLowerCase();
+    const map = {
+      'グラム':'g', 'ｇ':'g', 'g':'g', 'ml':'ml', 'ｍｌ':'ml',
+      '個':'個', '本':'本', '枚':'枚', '杯':'杯', 'パック':'パック', 'p':'パック',
+      '粒':'粒', '切':'切', '切れ':'切れ', '玉':'玉', '束':'束', '缶':'缶', '袋':'袋',
+      '皿':'皿', '食':'食', '箱':'箱', '尾':'尾', '貫':'貫', '合':'合', '個分':'個分',
+      '大さじ':'大さじ', '小さじ':'小さじ', 'スクープ':'スクープ', 'ピース':'ピース'
+    };
+    return map[raw] || raw;
+  }
+
   function parseCommand(raw) {
     const value = String(raw || '').normalize('NFKC').trim();
-    const match = value.match(/^(.+?)[\s　]*([0-9]+(?:\.[0-9]+)?)[\s　]*(g|グラム|ml|mL|個|本|枚|杯|パック)?$/i);
+    const match = value.match(/^(.+?)[\s　]*([0-9]+(?:\.[0-9]+)?)[\s　]*(g|グラム|ml|mL|個分|個|本|枚|杯|パック|P|粒|切れ|切|玉|束|缶|袋|皿|食|箱|尾|貫|合|大さじ|小さじ|スクープ|ピース)?$/i);
     if (!match) return null;
     const food = match[1].trim();
     const amount = Number(match[2]);
     if (!food || !Number.isFinite(amount) || amount <= 0) return null;
-    return { food, amount, typedUnit: match[3] || '' };
+    return { food, amount, typedUnit: normalizeTypedUnit(match[3] || '') };
+  }
+
+  function commandUnitMatches(index, typedUnit) {
+    if (!typedUnit) return true;
+    const meta = window.__PFC_DB_V3__?.get?.(index);
+    if (!meta) return true;
+    return normalizeTypedUnit(meta.input?.defaultUnit) === typedUnit;
   }
 
   function recordCommand(result, amount) {
@@ -135,19 +175,20 @@
     if (!command || !window.__PFC_SEARCH_V21__?.search) return;
 
     const hit = window.__PFC_SEARCH_V21__.search(command.food, 3)
-      .find(result => result?.source === 'db');
+      .find(result => result?.source === 'db' && commandUnitMatches(result.index, command.typedUnit));
     if (!hit) return;
 
     const row = typeof DB !== 'undefined' ? DB[hit.index] : null;
     if (!row) return;
-    const unit = typeof getFavoriteUnit === 'function'
-      ? getFavoriteUnit({ source: 'db', i: hit.index })
-      : (String(row[3] || '').includes('g') ? 'g' : '個');
+    const meta = window.__PFC_DB_V3__?.get?.(hit.index);
+    const amountLabel = meta && window.__PFC_DB_V3__?.formatAmount
+      ? window.__PFC_DB_V3__.formatAmount(meta, command.amount)
+      : `${fmt(command.amount)}${typeof getFavoriteUnit === 'function' ? getFavoriteUnit({ source: 'db', i: hit.index }) : ''}`;
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'v25-command-hit pfc-search-result';
-    button.innerHTML = `<span><strong>${hit.name}</strong><small>${fmt(command.amount)}${unit}で直接記録</small></span><b>追加</b>`;
+    button.innerHTML = `<span><strong>${hit.name}</strong><small>${amountLabel}で直接記録</small></span><b>追加</b>`;
     button.onclick = () => recordCommand(hit, command.amount);
 
     const previous = box.querySelector('.v25-command-hit');
@@ -175,7 +216,8 @@
       basket: false,
       mealSets: false,
       quickStepper: true,
-      smartCommandSearch: true
+      smartCommandSearch: true,
+      databaseV3Aware: !!window.__PFC_DB_V3__
     };
   }
 
