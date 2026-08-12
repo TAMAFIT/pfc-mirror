@@ -34,7 +34,7 @@
   },
   {
     "name": "本みりん",
-    "source": { "kind": "mext", "label": "文部科学省 日本食品標準成分表", "itemNo": "16015", "officialName": "＜アルコール飲料類＞　（混成酒類）　みりん　本みりん", "datasetSha256": "0d5a77077dd6cd91cbc2e6e317b8b218a38728c409eed452f1c10635a0d3099c", "verifiedAt": "2026-08-12", "per100g": { "p": 0.3, "f": 0.0, "c": 43.2, "kcal": 241.0, "a": 9.5 } }, "canonicalId": "mext:16015"
+    "source": { "kind": "mext", "label": "文部科学省 日本食品標準成分表", "itemNo": "16025", "officialName": "＜アルコール飲料類＞　（混成酒類）　みりん　本みりん", "datasetSha256": "0d5a77077dd6cd91cbc2e6e317b8b218a38728c409eed452f1c10635a0d3099c", "verifiedAt": "2026-08-12", "per100g": { "p": 0.3, "f": 0.0, "c": 43.2, "kcal": 241.0, "a": 9.5 } }, "canonicalId": "mext:16025"
   },
   {
     "name": "豚肩ロース(脂身つき)",
