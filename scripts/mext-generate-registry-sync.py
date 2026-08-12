@@ -29,6 +29,7 @@ def sync(report,entries):
             missing.append(item); continue
         official=row.get('official')
         nutrition_changed=False
+        name_changed=False
         if official:
             old=dict(target['source'].get('per100g') or {})
             new={
@@ -37,14 +38,17 @@ def sync(report,entries):
                 'a': float(official.get('a') or 0)
             }
             nutrition_changed=old != new
-            target['source']['officialName']=official.get('officialName') or target['source'].get('officialName')
+            official_name=official.get('officialName') or target['source'].get('officialName')
+            name_changed=official_name != target['source'].get('officialName')
+            target['source']['officialName']=official_name
             target['source']['per100g']=new
             if nutrition_changed: changes.append({'itemNo':item,'name':target.get('name'),'old':old,'new':new})
+            if name_changed: metadata.append({'itemNo':item,'name':target.get('name'),'field':'officialName'})
         snapshot_changed=bool(sha and target['source'].get('datasetSha256') != sha)
         if snapshot_changed:
             target['source']['datasetSha256']=sha
             metadata.append({'itemNo':item,'name':target.get('name'),'field':'datasetSha256'})
-        if nutrition_changed or snapshot_changed:
+        if nutrition_changed or name_changed or snapshot_changed:
             target['source']['verifiedAt']=verified_at
     return changes,missing,metadata,sha,verified_at
 
@@ -60,7 +64,9 @@ def render(original,match,entries,sha):
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--report',required=True); ap.add_argument('--registry',required=True); ap.add_argument('--write',action='store_true'); ap.add_argument('--out-json',default='mext-registry-sync.json'); args=ap.parse_args()
     report=json.loads(Path(args.report).read_text(encoding='utf-8')); original,match,entries=load_registry(args.registry)
-    changes,missing,metadata,sha,verified_at=sync(report,entries); updated=render(original,match,entries,sha)
+    changes,missing,metadata,sha,verified_at=sync(report,entries)
+    semantic_change=bool(changes or metadata)
+    updated=render(original,match,entries,sha) if semantic_change else original
     content_changed=updated != original
     if args.write and content_changed: Path(args.registry).write_text(updated,encoding='utf-8')
     result={'schemaVersion':2,'registry':args.registry,'contentChanged':content_changed,'nutritionChanges':changes,'metadataChanges':metadata,'missingRegistryItems':missing,'datasetSha256':sha,'verifiedAt':verified_at,'entryCount':len(entries)}
