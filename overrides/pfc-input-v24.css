@@ -247,6 +247,7 @@
   font-size: 12px;
 }
 #manual-inp-sec.quick-favorite-mode .favorite-quick-row {
+  display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto;
   align-content: start;
 }
