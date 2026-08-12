@@ -1,11 +1,11 @@
-// PFC Mirror Database V3 Phase B2: source-verified high-frequency foods.
+// PFC Mirror Database V3: source-verified high-frequency foods.
 (() => {
   'use strict';
 
-  const VERSION = '3.2.0';
+  const VERSION = '3.3.0';
 
-  // All nutrition source values are MEXT Food Composition Database values.
-  // Serving conversions are only applied when an official MAFF source gives a weight relationship.
+  // Nutrition source values are MEXT Food Composition Database values.
+  // Serving conversions are only applied when an official source gives a defensible relationship.
   const VERIFIED = [
     {
       name: 'こいくち醤油',
@@ -21,9 +21,7 @@
         kind: 'maff-recipe-weight',
         label: '農林水産省 上州きんぴら',
         url: 'https://www.maff.go.jp/j/keikaku/syokubunka/k_ryouri/search_menu/menu/32_10_gunma.html',
-        measure: '大さじ1',
-        grams: 18,
-        exactForEntry: true
+        measure: '大さじ1', grams: 18, exactForEntry: true
       }
     },
     {
@@ -40,9 +38,7 @@
         kind: 'maff-recipe-weight',
         label: '農林水産省 上州きんぴら',
         url: 'https://www.maff.go.jp/j/keikaku/syokubunka/k_ryouri/search_menu/menu/32_10_gunma.html',
-        measure: '大さじ1',
-        grams: 9,
-        exactForEntry: true,
+        measure: '大さじ1', grams: 9, exactForEntry: true,
         derivation: '小さじ2=6g → 小さじ1=3g → 大さじ1=9g'
       }
     },
@@ -57,10 +53,7 @@
         per100g: { p: 12.5, f: 6.0, c: 21.9, kcal: 182, a: 0.0 }
       },
       serving: {
-        kind: 'mass-only',
-        measure: '10g',
-        grams: 10,
-        exactForEntry: true,
+        kind: 'mass-only', measure: '10g', grams: 10, exactForEntry: true,
         note: '大さじ換算は製品差を考慮して未適用。g入力を正本とする。'
       }
     },
@@ -78,11 +71,96 @@
         kind: 'maff-recipe-weight',
         label: '農林水産省 上州きんぴら',
         url: 'https://www.maff.go.jp/j/keikaku/syokubunka/k_ryouri/search_menu/menu/32_10_gunma.html',
-        measure: '大さじ1',
-        grams: 18,
-        exactForEntry: true,
+        measure: '大さじ1', grams: 18, exactForEntry: true,
         derivation: '小さじ1=6g → 大さじ1=18g'
       }
+    },
+    {
+      name: '豚肩ロース(脂身つき)',
+      row: ['🍖肉類','豚肩ロース(脂身つき)','ぶたかたろーす 豚肩ロース 肩ロース ポーク 豚肉','100g',17.1,19.2,0.1,237],
+      source: {
+        kind: 'mext',
+        label: '文部科学省 食品成分データベース 豚 大型種肉 かたロース 脂身つき 生',
+        url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=11_11119_7',
+        itemNo: '11119',
+        per100g: { p: 17.1, f: 19.2, c: 0.1, kcal: 237, a: 0.0 }
+      },
+      serving: { kind: 'mass-only', measure: '100g', grams: 100, exactForEntry: true }
+    },
+    {
+      name: '鶏手羽元(皮つき)',
+      row: ['🍖肉類','鶏手羽元(皮つき)','とりてばもと 手羽元 てばもと 鶏肉 チキン','100g',18.2,12.8,0.0,175],
+      source: {
+        kind: 'mext',
+        label: '文部科学省 食品成分データベース 若どり 手羽もと 皮つき 生',
+        url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=11_11286_7',
+        itemNo: '11286',
+        per100g: { p: 18.2, f: 12.8, c: 0.0, kcal: 175, a: 0.0 }
+      },
+      serving: {
+        kind: 'mass-only', measure: '100g', grams: 100, exactForEntry: true,
+        note: '骨付きで個体差が大きいため「1本」の自動g換算は行わない。'
+      }
+    },
+    {
+      name: 'サバ(生)',
+      row: ['🐟魚介類','サバ(生)','さば サバ 鯖 まさば マサバ 魚 さかな','100g',20.6,16.8,0.3,211],
+      source: {
+        kind: 'mext',
+        label: '文部科学省 食品成分データベース まさば 生',
+        url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=10_10154_7',
+        itemNo: '10154',
+        per100g: { p: 20.6, f: 16.8, c: 0.3, kcal: 211, a: 0.0 }
+      },
+      serving: { kind: 'mass-only', measure: '100g', grams: 100, exactForEntry: true }
+    },
+    {
+      name: 'アジ(生)',
+      row: ['🐟魚介類','アジ(生)','あじ アジ 鯵 まあじ マアジ 魚 さかな','100g',19.7,4.5,0.1,112],
+      source: {
+        kind: 'mext',
+        label: '文部科学省 食品成分データベース まあじ 皮つき 生',
+        url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=10_10003_7',
+        itemNo: '10003',
+        per100g: { p: 19.7, f: 4.5, c: 0.1, kcal: 112, a: 0.0 }
+      },
+      serving: { kind: 'mass-only', measure: '100g', grams: 100, exactForEntry: true }
+    },
+    {
+      name: 'ピーマン',
+      row: ['🥦野菜','ピーマン','ぴーまん ピーマン 青ピーマン やさい 野菜','100g',0.9,0.2,5.1,20],
+      source: {
+        kind: 'mext',
+        label: '文部科学省 食品成分データベース 青ピーマン 果実 生',
+        url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06245_7',
+        itemNo: '06245',
+        per100g: { p: 0.9, f: 0.2, c: 5.1, kcal: 20, a: 0.0 }
+      },
+      serving: { kind: 'mass-only', measure: '100g', grams: 100, exactForEntry: true }
+    },
+    {
+      name: 'なす',
+      row: ['🥦野菜','なす','なす ナス 茄子 やさい 野菜','100g',1.1,0.1,5.1,18],
+      source: {
+        kind: 'mext',
+        label: '文部科学省 食品成分データベース なす 果実 生',
+        url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06191_7',
+        itemNo: '06191',
+        per100g: { p: 1.1, f: 0.1, c: 5.1, kcal: 18, a: 0.0 }
+      },
+      serving: { kind: 'mass-only', measure: '100g', grams: 100, exactForEntry: true }
+    },
+    {
+      name: '白菜',
+      row: ['🥦野菜','白菜','はくさい 白菜 やさい 野菜','100g',0.8,0.1,3.2,13],
+      source: {
+        kind: 'mext',
+        label: '文部科学省 食品成分データベース はくさい 結球葉 生',
+        url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06233_7',
+        itemNo: '06233',
+        per100g: { p: 0.8, f: 0.1, c: 3.2, kcal: 13, a: 0.0 }
+      },
+      serving: { kind: 'mass-only', measure: '100g', grams: 100, exactForEntry: true }
     }
   ];
 
@@ -119,7 +197,7 @@
       version: VERSION,
       names: VERIFIED.map(x => x.name),
       added,
-      sourcePolicy: 'MEXT nutrition + MAFF serving conversion when available'
+      sourcePolicy: 'MEXT nutrition + official serving conversion only when defensible'
     };
   }
 
