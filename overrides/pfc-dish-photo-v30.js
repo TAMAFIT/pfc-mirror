@@ -1,12 +1,15 @@
-// PFC Mirror V3.2: Gemini 3.5 Flash-Lite visual identification with user-confirmed quantities.
+// PFC Mirror V3.3: low-latency Gemini 3.5 Flash-Lite visual identification with user-confirmed quantities.
 (() => {
   'use strict';
 
-  const VERSION = '3.2.0';
+  const VERSION = '3.3.0';
   const MODEL = 'gemini-3.5-flash-lite';
-  const MAX_SIDE = 1280;
-  const JPEG_QUALITY = 0.86;
+  const THINKING_LEVEL = 'minimal';
+  const MAX_SIDE = 1024;
+  const JPEG_QUALITY = 0.80;
   const MAX_FOODS = 10;
+  const REQUEST_TIMEOUT_MS = 32000;
+  const RETRY_DELAY_MS = 700;
   const COUNT_UNITS = /^(個|切れ|枚|本|玉|杯|粒|袋|パック|カップ|缶|食)$/;
   let busy = false;
 
@@ -14,6 +17,7 @@
   const num = value => Number.isFinite(Number(value)) ? Number(value) : 0;
   const norm = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/\s+/g, '').trim();
   const baseName = value => norm(value).replace(/[（(].*?[)）]/g, '');
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   function parseVisibleCount(value) {
     const n = Math.round(Number(value));
@@ -40,7 +44,7 @@
       const key = norm(name);
       const parsed = {
         name,
-        confidence: Math.max(0, Math.min(1, num(typeof item === 'string' ? 0.5 : object.confidence))),
+        confidence: Math.max(0, Math.min(1, num(typeof item === 'string' ? 0 : object.confidence))),
         visibleCount: parseVisibleCount(object.visibleCount),
         ambiguity: String(object.ambiguity || '').trim().slice(0, 100),
         note: String(object.note || '').trim().slice(0, 100),
@@ -141,7 +145,7 @@
         <button type="button" id="dish-v30-camera"><b>カメラで撮る</b><span>今の食事をその場で撮影</span></button>
         <button type="button" id="dish-v30-library"><b>カメラロールから選ぶ</b><span>保存済みの写真を選択</span></button>
       </div>
-      <div class="dish-v30-note">AIは見えている食品を候補化します。種類と量は追加前に人が確認し、写真だけでP/F/C/kcalを確定しません。</div>`);
+      <div class="dish-v30-note">AIは見えている食品を候補化します。種類と量は追加前に確認し、写真だけでP/F/C/kcalを確定しません。</div>`);
     host.querySelector('#dish-v30-camera').onclick = () => { host.classList.remove('show'); selectPhoto('camera'); };
     host.querySelector('#dish-v30-library').onclick = () => { host.classList.remove('show'); selectPhoto('library'); };
   }
@@ -191,36 +195,92 @@
   }
 
   function identityPrompt() {
-    return `あなたは食事写真の「視覚的食品抽出器」です。栄養値や量の確定は別システムと人間が行います。画像から直接見える事実だけをJSONで返してください。
+    return `食事写真から、画像で直接確認できる食品だけを日本語で抽出し、JSONだけ返してください。
+ルール:
+- 弁当・定食は全体名だけで終わらず、見分けられる主食・主菜・卵・野菜・漬物・副菜を個別に列挙する。
+- 見えない具、味、肉の部位、ソース、調理法を推測しない。具が見えないおにぎりは必ず「おにぎり」。
+- 唐揚げか焼き物か断定できない等は安全な一般名（例「鶏料理」）にし、ambiguityへ候補を書く。
+- visibleCountは独立した個体を明確に数えられる時だけ整数。重なる・切れる・不明ならnull。
+- 重量g/ml、P/F/C、kcal、油・調味料量は出さない。
+- 食品でない画像はfoods=[]。Markdownや説明文は禁止。
+形式: {"dishName":"お弁当","uncertain":true,"foods":[{"name":"おにぎり","visibleCount":3,"ambiguity":"","note":"具は見えない"}]}
+最大${MAX_FOODS}食品。最後に個数と見落としだけ再確認してJSONを返す。`;
+  }
 
-厳守:
-1. 弁当・定食・ワンプレートは全体名だけで終わらず、視覚的に区別できる食品をできる限り個別列挙する。野菜・漬物・卵・副菜も拾う。
-2. 見えない具、味、肉の部位、ソース、調理法を補完しない。具が見えないおにぎりは「おにぎり」とだけ書く。ツナ・鮭・梅などにしない。
-3. 食品名は画像だけで言える最も一般的で安全な日本語名にする。唐揚げか焼き物か断定できなければ「鶏料理」とし、ambiguityに候補を書く。
-4. visibleCountは「画面上で独立した個体数を数えられる食品」だけに使う。数えにくい、重なる、切断される場合はnull。数は回答前にもう一度数え直す。
-5. 重量g、ml、カロリー、P/F/C、油量、調味料量、1本=何g等は絶対に推測しない。
-6. confidenceは食品名そのものの視覚的確信度だけ。0.95以上は形状が非常に明白な場合だけ。ただしアプリはこの数値を確定判定には使わない。
-7. variantVisible/countCertain等の安全判断フラグは返さない。安全判定はアプリ側で行う。
-8. 食品でない画像ならfoods=[]。説明文、Markdown、[DATA]、[UNKNOWN]は禁止。JSONだけ返す。
+  function buildRequestPayload(base64) {
+    return {
+      taskType:'image',
+      modelPreference:MODEL,
+      contents:[{parts:[{text:identityPrompt()}]}],
+      imageBase64:base64,
+      generationConfig:{
+        thinkingConfig:{thinkingLevel:THINKING_LEVEL},
+        maxOutputTokens:1024
+      }
+    };
+  }
 
-例:
-{"dishName":"お弁当","uncertain":true,"foods":[{"name":"おにぎり","confidence":0.96,"visibleCount":3,"ambiguity":"","note":"具は見えない"},{"name":"鶏料理","confidence":0.76,"visibleCount":2,"ambiguity":"唐揚げまたは焼き物","note":""},{"name":"卵焼き","confidence":0.9,"visibleCount":3,"ambiguity":"","note":""},{"name":"にんじん","confidence":0.9,"visibleCount":null,"ambiguity":"","note":"少量の副菜"}]}
+  function extractAiText(data) {
+    const parts = data?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return '';
+    return parts.map(part => typeof part?.text === 'string' ? part.text : '').join('').trim();
+  }
 
-最大${MAX_FOODS}食品。画像全体を確認→食品を列挙→個数を再確認、の順でJSONだけ返してください。`;
+  function classifyUpstreamText(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return null;
+    if (!/^GASエラー:/i.test(text) && !/^AI API /i.test(text)) return null;
+    const error = new Error(text.slice(0, 420));
+    error.retryable = /\b(?:429|500|502|503|504)\b/.test(text);
+    error.upstream = true;
+    return error;
+  }
+
+  async function requestIdentity(base64) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(endpoint(), {
+        method:'POST',
+        headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify(buildRequestPayload(base64)),
+        signal:controller.signal
+      });
+      if (!response.ok) {
+        const error = new Error(`画像AI HTTP ${response.status}`);
+        error.retryable = [429,500,502,503,504].includes(response.status);
+        throw error;
+      }
+      let data;
+      try { data = await response.json(); }
+      catch { throw new Error('GASからJSONではない応答が返りました'); }
+      const raw = extractAiText(data);
+      const upstreamError = classifyUpstreamText(raw);
+      if (upstreamError) throw upstreamError;
+      const parsed = parseIdentityResponse(raw);
+      if (!parsed) {
+        const sample = raw ? raw.replace(/\s+/g,' ').slice(0,220) : '空の応答';
+        throw new Error(`Gemini応答を食品JSONとして読めませんでした: ${sample}`);
+      }
+      return parsed;
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        const timeoutError = new Error(`Gemini 3.5 Flash-Liteが${Math.round(REQUEST_TIMEOUT_MS/1000)}秒以内に応答しませんでした`);
+        timeoutError.retryable = false;
+        throw timeoutError;
+      }
+      throw error;
+    } finally { clearTimeout(timer); }
   }
 
   async function identifyDish(base64) {
-    const payload = { taskType:'image', modelPreference:MODEL, contents:[{parts:[{text:identityPrompt()}]}], imageBase64:base64 };
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
     try {
-      const response = await fetch(endpoint(), { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload), signal:controller.signal });
-      if (!response.ok) throw new Error(`画像AI HTTP ${response.status}`);
-      const data = await response.json();
-      const parsed = parseIdentityResponse(data?.candidates?.[0]?.content?.parts?.[0]?.text || '');
-      if (!parsed) throw new Error('食品候補を読み取れませんでした');
-      return parsed;
-    } finally { clearTimeout(timer); }
+      return await requestIdentity(base64);
+    } catch (error) {
+      if (!error?.retryable) throw error;
+      await wait(RETRY_DELAY_MS);
+      return await requestIdentity(base64);
+    }
   }
 
   function nutritionPreview(row) {
@@ -292,6 +352,7 @@
             version:VERSION,
             identityOnly:true,
             model:MODEL,
+            thinkingLevel:THINKING_LEVEL,
             aiName:row.ai.name,
             visualConfidence:row.ai.confidence,
             visibleCountSuggestion:row.ai.visibleCount,
@@ -316,13 +377,13 @@
   async function runDishPhoto(file) {
     if (busy) return;
     busy = true;
-    modal('料理写真を判定中','<div class="dish-v30-loading"><span></span><b>Gemini 3.5 Flash-Liteで食品を確認しています</b></div><div class="dish-v30-note">種類・個数は候補として扱い、量や栄養値を写真だけで確定しません。</div>');
+    modal('料理写真を判定中','<div class="dish-v30-loading"><span></span><b>Gemini 3.5 Flash-Liteで食品を確認しています</b></div><div class="dish-v30-note">低遅延設定で処理しています。種類・個数は候補として扱い、量や栄養値を写真だけで確定しません。</div>');
     try {
       const identity = await identifyDish(await compressImage(file));
       if (!identity.foods.length) throw new Error('食べ物として認識できませんでした');
       showMatches(identity);
     } catch (error) {
-      const host = modal('判定できませんでした', `<div class="dish-v30-message">${esc(error?.message || '料理写真の判定に失敗しました')}</div><button class="dish-v30-primary" id="dish-v30-retry">写真を選び直す</button>`);
+      const host = modal('判定できませんでした', `<div class="dish-v30-message">${esc(error?.message || '料理写真の判定に失敗しました')}</div><div class="dish-v30-note">エラー内容をそのまま表示しています。再発時はこの画面のスクショで原因を特定できます。</div><button class="dish-v30-primary" id="dish-v30-retry">写真を選び直す</button>`);
       host.querySelector('#dish-v30-retry').onclick = () => { host.classList.remove('show'); choosePhotoSource(); };
     } finally { busy = false; }
   }
@@ -344,6 +405,10 @@
   window.__PFC_DISH_PHOTO_V30__ = {
     version:VERSION,
     model:MODEL,
+    thinkingLevel:THINKING_LEVEL,
+    requestTimeoutMs:REQUEST_TIMEOUT_MS,
+    imageMaxSide:MAX_SIDE,
+    jpegQuality:JPEG_QUALITY,
     identityOnly:true,
     nutritionFromAI:false,
     conservativeVisual:true,
@@ -352,12 +417,17 @@
     aiAmountAutoApplied:false,
     aiVariantFlagsTrusted:false,
     requiresUserAmount:true,
+    latencyOptimized:true,
+    retryTransient:true,
     cameraRoll:true,
     camera:true,
     parseIdentityResponse,
     isUnsafeSpecificMatch,
     resolveFood,
     resolveFoods,
+    buildRequestPayload,
+    extractAiText,
+    classifyUpstreamText,
     identifyDish,
     choosePhotoSource,
     selectPhoto,
