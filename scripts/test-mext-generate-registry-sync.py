@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory() as td:
     original,match,entries=m.load_registry(path)
     changes,missing,metadata,sha,verified=m.sync(report,entries)
     assert len(changes)==1 and not missing
-    assert len(metadata)==1 and metadata[0]['field']=='datasetSha256'
+    assert {x['field'] for x in metadata}=={'officialName','datasetSha256'}
     assert entries[0]['source']['per100g']=={'p':1.1,'f':2.2,'c':3.3,'kcal':41.0,'a':0.0}
     assert entries[0]['source']['officialName']=='new'
     assert entries[0]['source']['datasetSha256'].startswith('bbbb')
