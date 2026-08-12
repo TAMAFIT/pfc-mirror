@@ -5,17 +5,19 @@ from pathlib import Path
 SCRIPT=Path(__file__).with_name('mcdonalds-jp-reconcile.py')
 spec=importlib.util.spec_from_file_location('mcd',SCRIPT); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
-html='''<table><tr><th>Product Name</th><th>Energy (kcal)</th><th>Protein (g)</th><th>Fat (g)</th><th>Carbohydrate (g)</th></tr>
-<tr><td>Big Mac®</td><td>524</td><td>26.1</td><td>28.0</td><td>42.0</td></tr>
-<tr><td>Chicken Cheese (McChicken® Cheese)</td><td>436</td><td>16.4</td><td>23.6</td><td>40.3</td></tr></table>'''
+html='''<table><tr><th>Product Name</th><th>Calories kcal</th><th>Protein g</th><th>Fat g</th><th>Saturated fatty acids g</th><th>Carbohydrate g</th><th>Sugars g</th></tr>
+<tr><td>Big Mac®</td><td>524</td><td>26.1</td><td>28.0</td><td>10.77</td><td>42.0</td><td>8</td></tr>
+<tr><td>McChicken® Cheese</td><td>436</td><td>16.4</td><td>23.6</td><td>7.8</td><td>40.3</td><td>6</td></tr></table>'''
 p=m.TableParser(); p.feed(html)
 entries=[
  {'name':'ビッグマック','canonicalId':'restaurant:mcd-jp:big-mac','providerKey':'Big Mac','sourceMode':'nutrition-list'},
- {'name':'チキチー','canonicalId':'restaurant:mcd-jp:chikichee','providerKey':'Chicken Cheese','sourceMode':'nutrition-list'}
+ {'name':'チキチー','canonicalId':'restaurant:mcd-jp:chikichee','providerKey':'McChicken Cheese','sourceMode':'nutrition-list'}
 ]
+cols=m.nutrition_columns(p)
+assert cols and cols['c']==5
 found=m.parse_burger_list(p,entries)
 assert found['restaurant:mcd-jp:big-mac']['nutrition']=={'p':26.1,'f':28.0,'c':42.0,'kcal':524.0,'a':0.0}
-assert found['restaurant:mcd-jp:chikichee']['nutrition']['kcal']==436.0
+assert found['restaurant:mcd-jp:chikichee']['nutrition']=={'p':16.4,'f':23.6,'c':40.3,'kcal':436.0,'a':0.0}
 
 side='''<a href="/products/2010/">マックフライポテト®</a><a href="/products/1900/">チキンマックナゲット® 5ピース</a>'''
 sp=m.TableParser(); sp.feed(side)
