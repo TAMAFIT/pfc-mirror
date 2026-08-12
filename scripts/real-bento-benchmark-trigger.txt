@@ -1,1 +1,1 @@
-run exact bento benchmark
+run grounded count prompt benchmark
