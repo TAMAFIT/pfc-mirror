@@ -5,11 +5,11 @@ on:
     paths:
       - 'overrides/pfc-database-v3-verified*.js'
       - 'scripts/mext-reconcile.py'
+      - 'scripts/mext-reconcile-identifiers.py'
       - 'scripts/test-mext-reconcile.py'
       - '.github/workflows/mext-reconcile.yml'
   workflow_dispatch:
   schedule:
-    # Weekly is ample for a government master table that changes infrequently.
     - cron: '17 21 * * 1'
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/mext-reconcile.py \
+          python scripts/mext-reconcile-identifiers.py \
             --verified overrides/pfc-database-v3-verified.js \
             --verified overrides/pfc-database-v3-verified-b5.js \
             --out-json mext-reconcile-report.json \
