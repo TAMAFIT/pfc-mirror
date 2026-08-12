@@ -35,18 +35,18 @@ if (!html.includes('pfc-food-master-runtime.js')) {
 }
 fs.writeFileSync(htmlPath, html, 'utf8');
 
-const scanApply = path.join(root, 'scripts', 'apply-scan-v28.mjs');
-if (fs.existsSync(scanApply)) {
-  const scanResult = spawnSync(process.execPath, [scanApply], { stdio: 'inherit' });
-  if (scanResult.status !== 0) throw new Error('PFC scan V2.8 build step failed');
-}
+// Only the useful photo path remains. Barcode/Open Food Facts and local OCR are intentionally removed.
+const dishApply = path.join(root, 'scripts', 'apply-dish-photo-v30.mjs');
+if (!fs.existsSync(dishApply)) throw new Error('Dish photo v3.0 build script missing');
+const dishResult = spawnSync(process.execPath, [dishApply], { stdio: 'inherit' });
+if (dishResult.status !== 0) throw new Error('Dish photo v3.0 build step failed');
 html = fs.readFileSync(htmlPath, 'utf8');
 
 const scriptUrl = file => {
   const pattern = new RegExp(`<script[^>]+src=["']([^"']*${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"']*)["']`, 'i');
   return html.match(pattern)?.[1] || file;
 };
-const assetFiles = [...dataFiles, 'pfc-food-master-runtime.js'];
+const assetFiles = [...dataFiles, 'pfc-food-master-runtime.js', 'pfc-dish-photo-v30.js', 'pfc-dish-photo-v30.css'];
 const assets = assetFiles.map(file => ({ url: scriptUrl(file), sha256: hash(fs.readFileSync(path.join(dist, file))) }));
 assets.push({ url: 'index.html', sha256: hash(fs.readFileSync(htmlPath)) });
 const manifest = { schemaVersion: 2, fingerprint, generatedAt: new Date().toISOString(), strategy: 'local-first-next-launch', officialProviderAssets: ['pfc-food-master-mext-registry.js', 'pfc-food-master-restaurant-registry.js'], assets };
@@ -59,9 +59,11 @@ const corePos = finalHtml.indexOf('pfc-database-v3.js');
 const searchPos = finalHtml.indexOf('pfc-database-v3-search.js');
 const runtimePos = finalHtml.indexOf('pfc-food-master-runtime.js');
 const inputPos = finalHtml.indexOf('pfc-input-v25.js');
-if (!(mextPos >= 0 && restaurantPos > mextPos && corePos > restaurantPos && searchPos > corePos && runtimePos > searchPos && inputPos > runtimePos)) throw new Error('Food Master runtime/official-registry script order is invalid.');
+const dishPos = finalHtml.indexOf('pfc-dish-photo-v30.js');
+if (!(mextPos >= 0 && restaurantPos > mextPos && corePos > restaurantPos && searchPos > corePos && runtimePos > searchPos && inputPos > runtimePos && dishPos > inputPos)) throw new Error('Food Master runtime/dish photo script order is invalid.');
 if (!finalHtml.includes('pfc-food-master-runtime.js?v=100')) throw new Error('Food Master runtime cache version is stale.');
+if (!finalHtml.includes('pfc-dish-photo-v30.js?v=') || !finalHtml.includes('pfc-dish-photo-v30.css?v=')) throw new Error('Dish photo v3.0 final assets missing');
+for (const obsolete of ['pfc-scan-v28.js','pfc-scan-v28.css','pfc-dish-photo-v29.js','pfc-dish-photo-v29.css','pfc-dish-photo-v29-bootstrap.js']) if (finalHtml.includes(obsolete)) throw new Error(`obsolete scan asset leaked into final HTML: ${obsolete}`);
 if (!runtimeBuilt.includes(`const BUILD_FINGERPRINT = '${fingerprint}'`)) throw new Error('Food Master runtime fingerprint injection failed.');
-if (fs.existsSync(scanApply) && (!finalHtml.includes('pfc-scan-v28.js?v=') || !finalHtml.includes('pfc-scan-v28.css?v='))) throw new Error('PFC scan V2.8 final assets missing');
 
 console.log(`Food Master runtime ready: ${fingerprint}`);
