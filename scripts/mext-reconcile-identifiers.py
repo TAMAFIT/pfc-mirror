@@ -26,8 +26,6 @@ def discover_main_workbook(page=core.MEXT_PAGE):
             continue
         normalized = re.sub(r'\s+', '', label).lstrip('・･')
         seen.append((normalized, url))
-        # The main composition workbook label contains exactly this phrase.
-        # Companion books use forms such as 第2章本表（データ） or 第2章第1表（データ）.
         if '第2章（データ）' in normalized and all(x not in normalized for x in ('本表', '第1表', '第2表', '第3表', '第4表', '別表')):
             candidates.append((url, label))
     if len(candidates) != 1:
@@ -55,16 +53,17 @@ def pick_columns_by_identifier(workbook):
         def has_code(vals, pattern):
             return any(re.fullmatch(pattern, v) for v in normalized_values(vals))
 
-        def has_unit(vals, unit_pattern):
-            return any(re.fullmatch(unit_pattern, v, flags=re.I) for v in normalized_values(vals))
-
         food = pick(lambda t, v: 300 if '食品番号' in t else 0)
         name = pick(lambda t, v: 300 if '食品名' in t else 0)
-        kcal = pick(lambda t, v: 1200 if has_code(v, r'ENERC(?:[_-].*)?') and has_unit(v, r'KCAL(?:/100G)?') else 0)
-        protein = pick(lambda t, v: 1100 if has_code(v, r'PROT(?:[-_].*)?') and has_unit(v, r'G/100G') else 0)
-        fat = pick(lambda t, v: 1100 if has_code(v, r'FAT(?:[-_].*)?') and has_unit(v, r'G/100G') else 0)
-        carbs = pick(lambda t, v: 1100 if has_code(v, r'CHOCDF(?:[-_].*)?') and has_unit(v, r'G/100G') else 0)
-        alcohol = pick(lambda t, v: 1000 if has_code(v, r'ALC(?:[-_].*)?') and has_unit(v, r'G/100G') else 0)
+
+        # MEXT's main table already declares values as edible portion per 100 g.
+        # The component identifier is therefore the stable machine key; requiring
+        # a per-column "g/100g" unit incorrectly rejects PROT-/FAT-/CHOCDF.
+        kcal = pick(lambda t, v: 1200 if has_code(v, r'ENERC_KCAL') else 0)
+        protein = pick(lambda t, v: 1100 if has_code(v, r'PROT(?:[-_].*)?') else 0)
+        fat = pick(lambda t, v: 1100 if has_code(v, r'FAT(?:[-_].*)?') else 0)
+        carbs = pick(lambda t, v: 1100 if has_code(v, r'CHOCDF(?:[-_].*)?') else 0)
+        alcohol = pick(lambda t, v: 1000 if has_code(v, r'ALC(?:[-_].*)?') else 0)
 
         required = [food, name, kcal, protein, fat, carbs]
         diagnostics.append((ws.title, {
@@ -85,8 +84,8 @@ def pick_columns_by_identifier(workbook):
         concise = {}
         for ws in workbook.worksheets[:2]:
             rows = []
-            for col in range(1, min(ws.max_column, 50) + 1):
-                vals = [core.text(ws.cell(r, col).value) for r in range(1, min(ws.max_row, 7) + 1)]
+            for col in range(1, min(ws.max_column, 55) + 1):
+                vals = [core.text(ws.cell(r, col).value) for r in range(1, min(ws.max_row, 9) + 1)]
                 if any(vals):
                     rows.append({'col': col, 'header': vals})
             concise[ws.title] = rows
