@@ -1,0 +1,194 @@
+name: McDonald's Japan Food Master Reconcile
+
+on:
+  pull_request:
+    paths:
+      - 'overrides/pfc-food-master-restaurant-registry.js'
+      - 'scripts/mcdonalds-jp-reconcile.py'
+      - 'scripts/mcdonalds-jp-sync.py'
+      - 'scripts/test-mcdonalds-jp-reconcile.py'
+      - 'scripts/test-mcdonalds-jp-sync.py'
+      - '.github/workflows/mcdonalds-jp-reconcile.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '37 22 * * 1'
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: mcd-jp-food-master-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'maintenance' }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout mirror controls
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test official-page parser
+        run: python scripts/test-mcdonalds-jp-reconcile.py
+
+      - name: Test registry sync generator
+        run: python scripts/test-mcdonalds-jp-sync.py
+
+      - name: Reconcile McDonald's Japan official sources
+        id: reconcile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/mcdonalds-jp-reconcile.py \
+            --registry overrides/pfc-food-master-restaurant-registry.js \
+            --out-json mcd-jp-reconcile-report.json \
+            --out-md mcd-jp-reconcile-report.md
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          r=json.load(open('mcd-jp-reconcile-report.json',encoding='utf-8'))
+          print(f"checked={r['checked']}")
+          print(f"confirmed={r['confirmed']}")
+          print(f"drift={r['drift']}")
+          print(f"missing={r['missing']}")
+          print(f"sha256={r['sourceSnapshotSha256']}")
+          PY
+
+      - name: Generate safe restaurant-registry sync candidate
+        if: github.event_name != 'pull_request'
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/mcdonalds-jp-sync.py \
+            --report mcd-jp-reconcile-report.json \
+            --registry overrides/pfc-food-master-restaurant-registry.js \
+            --write \
+            --out-json mcd-jp-sync.json
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          r=json.load(open('mcd-jp-sync.json',encoding='utf-8'))
+          print('changed=' + ('true' if r['contentChanged'] else 'false'))
+          print(f"changes={len(r['changes'])}")
+          print(f"missing_registry={len(r['missingRegistryItems'])}")
+          PY
+
+      - name: Publish reconciliation summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -s mcd-jp-reconcile-report.md ]; then cat mcd-jp-reconcile-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+          if [ -s mcd-jp-sync.json ]; then
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo '## Registry sync candidate' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat mcd-jp-sync.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcd-jp-food-master-reconcile
+          path: |
+            mcd-jp-reconcile-report.json
+            mcd-jp-reconcile-report.md
+            mcd-jp-sync.json
+          if-no-files-found: warn
+
+      - name: Comment pull request
+        if: github.event_name == 'pull_request' && always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          if [ -s mcd-jp-reconcile-report.md ]; then
+            {
+              echo '<!-- pfc-mcd-jp-reconcile -->'
+              cat mcd-jp-reconcile-report.md
+              echo
+              echo '_Burgers are reconciled against the official nutrition list; sides are rediscovered from the official side menu before product-page parsing._'
+            } > /tmp/mcd-pr-comment.md
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/mcd-pr-comment.md --edit-last --create-if-none
+          fi
+
+      - name: Create or update McDonald's sync pull request
+        if: github.event_name != 'pull_request' && steps.sync.outputs.changed == 'true' && steps.reconcile.outputs.missing == '0'
+        id: sync_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SYNC_BRANCH: bot/mcd-jp-food-master-sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$SYNC_BRANCH"
+          git add overrides/pfc-food-master-restaurant-registry.js
+          git commit -m "Sync Food Master with McDonald's Japan official nutrition"
+          git push --force origin "$SYNC_BRANCH"
+
+          cat > /tmp/mcd-sync-pr.md <<'EOF'
+          ## Automated McDonald's Japan Food Master sync
+
+          Current official menu nutrition changed and generated this review-only registry update.
+
+          - Checked: ${{ steps.reconcile.outputs.checked }}
+          - Drift before sync: ${{ steps.reconcile.outputs.drift }}
+          - Registry records changed: ${{ steps.sync.outputs.changes }}
+          - Official normalized snapshot SHA-256: `${{ steps.reconcile.outputs.sha256 }}`
+
+          This PR is **never auto-merged**. Runtime remains local-first; official pages are only accessed by maintenance CI.
+          EOF
+
+          PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$SYNC_BRANCH" --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$SYNC_BRANCH" --title "[McDonald's Japan] Sync Food Master registry" --body-file /tmp/mcd-sync-pr.md)
+            PR=${URL##*/}
+          else
+            gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --title "[McDonald's Japan] Sync Food Master registry" --body-file /tmp/mcd-sync-pr.md
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "Official McDonald's Japan sync candidate refreshed from workflow run $GITHUB_RUN_ID."
+          fi
+          echo "pr_number=$PR" >> "$GITHUB_OUTPUT"
+
+          gh workflow run voicedev.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+          gh workflow run database-v3-audit.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+          gh workflow run food-master-provider-routing.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+          gh workflow run mcdonalds-jp-reconcile.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+
+      - name: Open or refresh reconciliation issue
+        if: github.event_name != 'pull_request' && (steps.reconcile.outputs.drift != '0' || steps.reconcile.outputs.missing != '0')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo '<!-- pfc-mcd-jp-reconcile-drift -->'
+            cat mcd-jp-reconcile-report.md
+            echo
+            if [ -n "${{ steps.sync_pr.outputs.pr_number }}" ]; then echo "Generated review PR: #${{ steps.sync_pr.outputs.pr_number }}"; fi
+            echo "Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > /tmp/mcd-issue.md
+          ISSUE=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "McDonald's Japan Food Master reconciliation drift in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$ISSUE" ]; then
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file /tmp/mcd-issue.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "[McDonald's Japan] Food Master reconciliation drift" --body-file /tmp/mcd-issue.md
+          fi
+
+      - name: Enforce official parity on pull requests
+        if: github.event_name == 'pull_request' && (steps.reconcile.outputs.drift != '0' || steps.reconcile.outputs.missing != '0')
+        run: |
+          echo "McDonald's Japan-backed Food Master entries are not in parity with current official sources." >&2
+          exit 1
