@@ -3,28 +3,36 @@ name: MEXT Food Master Reconcile
 on:
   pull_request:
     paths:
-      - 'overrides/pfc-database-v3-verified*.js'
-      - 'overrides/pfc-database-v3-mext-promoted.js'
+      - 'overrides/pfc-food-master-mext-registry.js'
       - 'scripts/mext-reconcile.py'
       - 'scripts/mext-reconcile-identifiers.py'
+      - 'scripts/mext-generate-registry-sync.py'
       - 'scripts/test-mext-reconcile.py'
+      - 'scripts/test-mext-generate-registry-sync.py'
       - '.github/workflows/mext-reconcile.yml'
   workflow_dispatch:
   schedule:
     - cron: '17 21 * * 1'
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
+  actions: write
+
+concurrency:
+  group: mext-food-master-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'maintenance' }}
+  cancel-in-progress: false
 
 jobs:
   reconcile:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout mirror controls
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -37,15 +45,16 @@ jobs:
       - name: Test reconciliation parser
         run: python scripts/test-mext-reconcile.py
 
-      - name: Reconcile current MEXT-backed foods
+      - name: Test registry sync generator
+        run: python scripts/test-mext-generate-registry-sync.py
+
+      - name: Reconcile central MEXT Food Master registry
         id: reconcile
         shell: bash
         run: |
           set -euo pipefail
           python scripts/mext-reconcile-identifiers.py \
-            --verified overrides/pfc-database-v3-verified.js \
-            --verified overrides/pfc-database-v3-verified-b5.js \
-            --verified overrides/pfc-database-v3-mext-promoted.js \
+            --verified overrides/pfc-food-master-mext-registry.js \
             --out-json mext-reconcile-report.json \
             --out-md mext-reconcile-report.md
 
@@ -60,6 +69,26 @@ jobs:
           print(f"workbook_url={r['source']['workbookUrl']}")
           PY
 
+      - name: Generate safe registry sync candidate
+        if: github.event_name != 'pull_request'
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/mext-generate-registry-sync.py \
+            --report mext-reconcile-report.json \
+            --registry overrides/pfc-food-master-mext-registry.js \
+            --write \
+            --out-json mext-registry-sync.json
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          r=json.load(open('mext-registry-sync.json', encoding='utf-8'))
+          print('changed=' + ('true' if r['contentChanged'] else 'false'))
+          print(f"nutrition_changes={len(r['nutritionChanges'])}")
+          print(f"metadata_changes={len(r['metadataChanges'])}")
+          print(f"missing_registry={len(r['missingRegistryItems'])}")
+          PY
+
       - name: Publish reconciliation summary
         if: always()
         shell: bash
@@ -68,6 +97,13 @@ jobs:
             cat mext-reconcile-report.md >> "$GITHUB_STEP_SUMMARY"
           else
             echo 'MEXT reconciliation did not produce a report.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -s mext-registry-sync.json ]; then
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo '## Registry sync candidate' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat mext-registry-sync.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload reconciliation evidence
@@ -78,6 +114,7 @@ jobs:
           path: |
             mext-reconcile-report.json
             mext-reconcile-report.md
+            mext-registry-sync.json
           if-no-files-found: warn
 
       - name: Comment pull request
@@ -97,7 +134,52 @@ jobs:
             gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/mext-pr-comment.md --edit-last --create-if-none
           fi
 
-      - name: Open or refresh scheduled drift issue
+      - name: Create or update MEXT sync pull request
+        if: github.event_name != 'pull_request' && steps.sync.outputs.changed == 'true' && steps.reconcile.outputs.missing == '0'
+        id: sync_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SYNC_BRANCH: bot/mext-food-master-sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$SYNC_BRANCH"
+          git add overrides/pfc-food-master-mext-registry.js
+          git commit -m 'Sync Food Master with current MEXT'
+          git push --force origin "$SYNC_BRANCH"
+
+          cat > /tmp/mext-sync-pr.md <<'EOF'
+          ## Automated MEXT Food Master sync
+
+          The scheduled official-source reconciliation detected a new MEXT snapshot and/or nutrition drift and generated this review-only update.
+
+          - Checked: ${{ steps.reconcile.outputs.checked }}
+          - Drift before sync: ${{ steps.reconcile.outputs.drift }}
+          - Nutrition changes: ${{ steps.sync.outputs.nutrition_changes }}
+          - Metadata changes: ${{ steps.sync.outputs.metadata_changes }}
+          - Official workbook SHA-256: `${{ steps.reconcile.outputs.sha256 }}`
+
+          This PR is **never auto-merged**. The central registry is updated by MEXT item number; normal app usage remains local-first and does not call MEXT.
+          EOF
+
+          PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$SYNC_BRANCH" --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$SYNC_BRANCH" --title '[MEXT] Sync Food Master registry' --body-file /tmp/mext-sync-pr.md)
+            PR=${URL##*/}
+          else
+            gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --title '[MEXT] Sync Food Master registry' --body-file /tmp/mext-sync-pr.md
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "Official MEXT sync candidate refreshed from workflow run $GITHUB_RUN_ID."
+          fi
+          echo "pr_number=$PR" >> "$GITHUB_OUTPUT"
+
+          gh workflow run voicedev.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+          gh workflow run database-v3-audit.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+          gh workflow run mext-auto-map.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+          gh workflow run mext-reconcile.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+
+      - name: Open or refresh reconciliation issue
         if: github.event_name != 'pull_request' && (steps.reconcile.outputs.drift != '0' || steps.reconcile.outputs.missing != '0')
         env:
           GH_TOKEN: ${{ github.token }}
@@ -107,6 +189,9 @@ jobs:
             echo '<!-- pfc-mext-reconcile-drift -->'
             cat mext-reconcile-report.md
             echo
+            if [ -n "${{ steps.sync_pr.outputs.pr_number }}" ]; then
+              echo "Generated review PR: #${{ steps.sync_pr.outputs.pr_number }}"
+            fi
             echo "Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           } > /tmp/mext-issue.md
           ISSUE=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'MEXT Food Master reconciliation drift in:title' --json number --jq '.[0].number // empty')

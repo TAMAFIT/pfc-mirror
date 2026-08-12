@@ -91,6 +91,40 @@ def pick_columns_by_identifier(workbook):
     return best[1], best[2]
 
 
+def parse_registry(path):
+    text = Path(path).read_text(encoding='utf-8')
+    match = re.search(r'// REGISTRY_DATA_START\s*const ENTRIES\s*=\s*(\[[\s\S]*?\]);\s*// REGISTRY_DATA_END', text)
+    if not match:
+        return None
+    rows = json.loads(match.group(1))
+    out = []
+    for entry in rows:
+        source = entry.get('source') or {}
+        per100g = source.get('per100g') or {}
+        if source.get('kind') != 'mext':
+            continue
+        out.append({
+            'file': str(path),
+            'name': entry.get('name'),
+            'itemNo': core.norm_item(source.get('itemNo')),
+            'per100g': {k: float(per100g.get(k, 0) or 0) for k in ('p','f','c','kcal','a')}
+        })
+    return out
+
+
+def registry_aware_verified(paths):
+    out = []
+    for path in paths:
+        registry = parse_registry(path)
+        if registry is not None:
+            out.extend(registry)
+        else:
+            out.extend(_base_verified([path]))
+    if not out:
+        raise RuntimeError('No MEXT entries parsed from source files')
+    return out
+
+
 def reconcile_blank_alcohol_as_zero(entries, rows):
     normalized = {}
     for item_no, row in rows.items():
@@ -101,9 +135,11 @@ def reconcile_blank_alcohol_as_zero(entries, rows):
     return _base_reconcile(entries, normalized)
 
 
+_base_verified = core.verified
 _base_reconcile = core.reconcile
 core.discover_workbook = discover_main_workbook
 core.pick_columns = pick_columns_by_identifier
+core.verified = registry_aware_verified
 core.reconcile = reconcile_blank_alcohol_as_zero
 
 if __name__ == '__main__':

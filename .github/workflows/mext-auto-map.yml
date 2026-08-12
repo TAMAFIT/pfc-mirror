@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'overrides/pfc-database-v3*.js'
+      - 'overrides/pfc-food-master-mext-registry.js'
       - 'scripts/export-effective-food-master.mjs'
       - 'scripts/audit-food-master-provenance.mjs'
       - 'scripts/test-database-v3-mext-promoted.mjs'
