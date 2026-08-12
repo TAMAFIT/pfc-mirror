@@ -33,10 +33,13 @@ jobs:
       - name: Validate audit output
         run: |
           test -s database-v3-audit.json
+          test -s _source_pfc/database.js
           node -e "const r=require('./database-v3-audit.json'); if(!r.totalRows || !r.categories || !r.unitFamilies) process.exit(1); console.log('audit-json-ok')"
 
-      - name: Upload audit report
+      - name: Upload audit report and source snapshot
         uses: actions/upload-artifact@v4
         with:
           name: database-v3-audit
-          path: database-v3-audit.json
+          path: |
+            database-v3-audit.json
+            _source_pfc/database.js
