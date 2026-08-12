@@ -8,7 +8,7 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - uses: actions/setup-python@v5
         with:
@@ -20,31 +20,36 @@ jobs:
           GAS_URL: https://script.google.com/macros/s/AKfycbxRNfeijUEwXwoFgBYbS60S5zn2fcuqHSm4TAbRePUzjTjqInXu10ZmK4cUvxoJ-dCAxw/exec
         run: |
           python - <<'PY'
-          import base64, io, json, os, time, urllib.request
+          import base64, io, json, os, time, urllib.request, urllib.error
           from PIL import Image
 
           image = Image.new('RGB', (64, 64), 'white')
           buf = io.BytesIO(); image.save(buf, 'JPEG', quality=70)
           jpg = base64.b64encode(buf.getvalue()).decode()
 
-          def probe(label, model, with_image):
+          def probe(label, model, with_image, config=True):
               payload = {
                   'taskType': 'image' if with_image else 'chat',
                   'modelPreference': model,
                   'contents': [{'parts': [{'text': '{"foods":[]}だけ返してください。' if with_image else 'OK とだけ返してください。'}]}],
-                  'generationConfig': {'thinkingConfig': {'thinkingLevel': 'minimal'}, 'maxOutputTokens': 128},
               }
+              if config:
+                  payload['generationConfig'] = {'thinkingConfig': {'thinkingLevel': 'minimal'}, 'maxOutputTokens': 128}
               if with_image: payload['imageBase64'] = jpg
               req = urllib.request.Request(os.environ['GAS_URL'], data=json.dumps(payload).encode(), headers={'Content-Type':'text/plain'}, method='POST')
               started = time.perf_counter()
               try:
-                  with urllib.request.urlopen(req, timeout=45) as res:
+                  with urllib.request.urlopen(req, timeout=50) as res:
                       body = res.read().decode(errors='replace')
-                      print(json.dumps({'label':label,'model':model,'image':with_image,'status':res.status,'seconds':round(time.perf_counter()-started,3),'body':body[:1000]}, ensure_ascii=False))
+                      print(json.dumps({'label':label,'model':model,'image':with_image,'config':config,'status':res.status,'seconds':round(time.perf_counter()-started,3),'body':body[:1600]}, ensure_ascii=False))
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode(errors='replace')
+                  print(json.dumps({'label':label,'model':model,'image':with_image,'config':config,'status':e.code,'seconds':round(time.perf_counter()-started,3),'error':repr(e),'body':body[:2000],'url':e.geturl()}, ensure_ascii=False))
               except Exception as e:
-                  print(json.dumps({'label':label,'model':model,'image':with_image,'seconds':round(time.perf_counter()-started,3),'error':repr(e)}, ensure_ascii=False))
+                  print(json.dumps({'label':label,'model':model,'image':with_image,'config':config,'seconds':round(time.perf_counter()-started,3),'error':repr(e)}, ensure_ascii=False))
 
-          probe('3.5-text', 'gemini-3.5-flash-lite', False)
-          probe('3.5-image', 'gemini-3.5-flash-lite', True)
-          probe('3.1-image', 'gemini-3.1-flash-lite', True)
+          probe('3.5-text-minimal', 'gemini-3.5-flash-lite', False, True)
+          probe('3.5-image-no-config', 'gemini-3.5-flash-lite', True, False)
+          probe('3.5-image-minimal', 'gemini-3.5-flash-lite', True, True)
+          probe('3.1-image-minimal', 'gemini-3.1-flash-lite', True, True)
           PY
