@@ -42,6 +42,29 @@ jobs:
       - name: Install workbook parser
         run: python -m pip install --disable-pip-version-check 'openpyxl>=3.1,<4'
 
+      - name: One-time bootstrap central registry identities
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/food-master-mext-central-registry' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$HEAD_BRANCH"
+          git switch -C "$HEAD_BRANCH" "origin/$HEAD_BRANCH"
+          python scripts/bootstrap-mext-registry-identities.py \
+            --registry overrides/pfc-food-master-mext-registry.js \
+            --legacy overrides/pfc-database-v3-verified.js \
+            --legacy overrides/pfc-database-v3-verified-b5.js \
+            --write \
+            --out-json mext-registry-bootstrap.json
+          if ! git diff --quiet -- overrides/pfc-food-master-mext-registry.js; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add overrides/pfc-food-master-mext-registry.js
+            git commit -m 'Align central MEXT registry item numbers'
+            git push origin "HEAD:$HEAD_BRANCH"
+          fi
+
       - name: Test reconciliation parser
         run: python scripts/test-mext-reconcile.py
 
@@ -174,8 +197,6 @@ jobs:
           fi
           echo "pr_number=$PR" >> "$GITHUB_OUTPUT"
 
-          # GITHUB_TOKEN-created PR events do not recursively start workflows.
-          # Dispatch the validation suites explicitly on the generated branch.
           gh workflow run voicedev.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
           gh workflow run database-v3-audit.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
           gh workflow run mext-auto-map.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
