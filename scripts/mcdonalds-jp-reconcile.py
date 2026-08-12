@@ -68,15 +68,21 @@ def parse_registry(path):
     return json.loads(m.group(1))
 
 def parse_burger_list(parser,entries):
-    targets={norm(e['providerKey']):e for e in entries if e.get('sourceMode')=='nutrition-list'}
-    found={}
+    rows=[]
     for row in parser.rows:
         if len(row)<5: continue
-        key=norm(row[0])
-        entry=targets.get(key)
-        if not entry: continue
         vals=[number(x) for x in row[1:5]]
         if any(v is None for v in vals): continue
+        rows.append((norm(row[0]),row,vals))
+    found={}
+    for entry in entries:
+        if entry.get('sourceMode')!='nutrition-list': continue
+        target=norm(entry.get('providerKey'))
+        exact=[x for x in rows if x[0]==target]
+        prefix=[x for x in rows if x[0].startswith(target)] if not exact else []
+        matches=exact or prefix
+        if len(matches)!=1: continue
+        _,row,vals=matches[0]
         kcal,p,f,c=vals
         found[entry['canonicalId']]={
             'canonicalId':entry['canonicalId'],'name':entry['name'],'officialName':row[0],
@@ -136,7 +142,6 @@ def parse_product_page(url,entry):
         'c':row_value(p,['炭水化物','carbohydrate'])
     }
     if any(v is None for v in values.values()):
-        # Some page templates expose nutrition as adjacent text rather than table cells.
         flat=clean_text(' '.join(p.all_text))
         patterns={
             'kcal':r'(?:エネルギー|Energy)[^0-9]{0,30}(\d+(?:\.\d+)?)',
