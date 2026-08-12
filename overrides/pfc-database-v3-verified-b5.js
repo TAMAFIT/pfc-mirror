@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.5.0';
+  const VERSION = '3.5.1';
   const VERIFIED = [
     {
       name: 'まだら(生)',
@@ -24,8 +24,8 @@
     },
     {
       name: 'マンゴー(生)',
-      row: ['🍎果物','マンゴー(生)','まんごー マンゴー 果物 くだもの フルーツ','100g',0.6,0.1,15.7,68],
-      source: { kind: 'mext', label: '文部科学省 食品成分データベース マンゴー 生', url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=7_07132_7', itemNo: '07132', per100g: { p: 0.6, f: 0.1, c: 15.7, kcal: 68, a: 0 } },
+      row: ['🍎果物','マンゴー(生)','まんごー マンゴー 果物 くだもの フルーツ','100g',0.6,0.1,16.9,68],
+      source: { kind: 'mext', label: '文部科学省 食品成分データベース マンゴー 生', url: 'https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=7_07132_7', itemNo: '07132', per100g: { p: 0.6, f: 0.1, c: 16.9, kcal: 68, a: 0 } },
       serving: { kind: 'mass-only', measure: '100g', grams: 100, exactForEntry: true, note: '廃棄率35%かつ果実サイズ差があるため1個への自動換算は行わない。' }
     },
     {

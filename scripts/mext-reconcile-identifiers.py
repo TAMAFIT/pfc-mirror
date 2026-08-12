@@ -55,10 +55,6 @@ def pick_columns_by_identifier(workbook):
 
         food = pick(lambda t, v: 300 if '食品番号' in t else 0)
         name = pick(lambda t, v: 300 if '食品名' in t else 0)
-
-        # MEXT's main table already declares values as edible portion per 100 g.
-        # The component identifier is therefore the stable machine key; requiring
-        # a per-column "g/100g" unit incorrectly rejects PROT-/FAT-/CHOCDF.
         kcal = pick(lambda t, v: 1200 if has_code(v, r'ENERC_KCAL') else 0)
         protein = pick(lambda t, v: 1100 if has_code(v, r'PROT(?:[-_].*)?') else 0)
         fat = pick(lambda t, v: 1100 if has_code(v, r'FAT(?:[-_].*)?') else 0)
@@ -95,8 +91,20 @@ def pick_columns_by_identifier(workbook):
     return best[1], best[2]
 
 
+def reconcile_blank_alcohol_as_zero(entries, rows):
+    normalized = {}
+    for item_no, row in rows.items():
+        copied = dict(row)
+        if copied.get('a') is None:
+            copied['a'] = 0.0
+        normalized[item_no] = copied
+    return _base_reconcile(entries, normalized)
+
+
+_base_reconcile = core.reconcile
 core.discover_workbook = discover_main_workbook
 core.pick_columns = pick_columns_by_identifier
+core.reconcile = reconcile_blank_alcohol_as_zero
 
 if __name__ == '__main__':
     sys.exit(core.main())
