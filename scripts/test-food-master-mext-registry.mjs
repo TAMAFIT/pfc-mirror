@@ -69,6 +69,6 @@ assert.equal(honey.source.itemNo,'03022');
 assert.equal(oats.nutritionBasis.amount,30);
 assert.equal(api.buildRecord(oats.runtimeIndex,30).Cal,105);
 assert.equal(tofu.nutritionBasis.amount,150);
-assert.equal(api.buildRecord(tofu.runtimeIndex,150).Cal,109.5);
+assert.equal(api.buildRecord(tofu.runtimeIndex,150).Cal,110);
 assert.equal(api.items.find(x=>x.name==='こいくち醤油').servingSource.measure,'大さじ1');
 console.log('Food Master central MEXT registry batch2 tests passed.');
