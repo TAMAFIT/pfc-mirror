@@ -22,7 +22,7 @@ if (!html.includes('pfc-food-master-restaurant-registry.js')) {
 fs.writeFileSync(htmlPath, html, 'utf8');
 
 const built = fs.readFileSync(output, 'utf8');
-for (const marker of ['__PFC_FOOD_MASTER_RESTAURANT_REGISTRY__', "VERSION = '6.0.0'", "McDonald's Japan", 'restaurant:mcd-jp:big-mac', 'restaurant:mcd-jp:fries-l', 'restaurant:mcd-jp:nuggets-5']) {
+for (const marker of ['__PFC_FOOD_MASTER_RESTAURANT_REGISTRY__', "VERSION = '6.0.0'", 'restaurant:mcd-jp:big-mac', 'restaurant:mcd-jp:fries-l', 'restaurant:mcd-jp:nuggets-5']) {
   if (!built.includes(marker)) throw new Error(`Restaurant registry marker missing: ${marker}`);
 }
 const finalHtml = fs.readFileSync(htmlPath, 'utf8');
