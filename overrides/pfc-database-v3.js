@@ -5,6 +5,7 @@
   const VERSION = '3.0.0';
   const LEGACY_SOURCE_ROWS = 408;
   const MIGRATION_MARKER = 'pfc-db-v3-favorite-units-300';
+  const ENERGY_POLICY = 'stored kcal';
 
   const GENERIC_ALIAS_TOKENS = new Set([
     '肉','にく','魚','さかな','米','こめ','ごはん','麺','めん','パン','ぱん',
@@ -170,8 +171,12 @@
       if (basis.amount < 1) return basis.amount;
       return 0.5;
     }
-    if (basis.type === 'package') return 1;
+    if (basis.type === 'package') {
+      if (basis.amount < 1) return basis.amount;
+      return 1;
+    }
     if (basis.type === 'count') {
+      if (basis.amount < 1) return basis.amount;
       if (basis.amount >= 10) return 5;
       return 1;
     }
@@ -202,7 +207,7 @@
     const a = Number.isFinite(Number(row?.[8])) ? Number(row[8]) : 0;
     const category = normalizeCategory(row);
     const displayUnit = displayUnitFor(row, basis);
-    const confidence = basis.vague ? 'low' : (index >= LEGACY_SOURCE_ROWS ? 'medium' : 'medium');
+    const confidence = basis.vague ? 'low' : 'medium';
 
     return {
       id: `db:${normalize(name)}:${index}`,
@@ -414,6 +419,7 @@
     window.__PFC_DB_V3__ = {
       version: VERSION,
       phase: 'A',
+      energyPolicy: ENERGY_POLICY,
       legacySourceRows: LEGACY_SOURCE_ROWS,
       get items() { return items; },
       get,
