@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
@@ -24,6 +25,7 @@ for (const required of [verifiedSource, verifiedB5Source, promotedSource, regist
   if (!fs.existsSync(required)) throw new Error(`Database V3 catalog dependency missing: ${required}`);
 }
 
+const registryCache = createHash('sha256').update(fs.readFileSync(registrySource)).digest('hex').slice(0, 12);
 fs.copyFileSync(verifiedSource, verifiedOutput);
 fs.copyFileSync(verifiedB5Source, verifiedB5Output);
 fs.copyFileSync(promotedSource, promotedOutput);
@@ -42,7 +44,7 @@ const injectBeforeCore = (name, version, error) => {
 injectBeforeCore('pfc-database-v3-verified.js', '340', 'Database V3 core script tag was not found.');
 injectBeforeCore('pfc-database-v3-verified-b5.js', '351', 'Database V3 core script tag was not found for B5.');
 injectBeforeCore('pfc-database-v3-mext-promoted.js', '380', 'Database V3 core script tag was not found for MEXT promotion.');
-injectBeforeCore('pfc-food-master-mext-registry.js', '400', 'Database V3 core script tag was not found for central MEXT registry.');
+injectBeforeCore('pfc-food-master-mext-registry.js', registryCache, 'Database V3 core script tag was not found for central MEXT registry.');
 
 if (!html.includes('pfc-database-v3-catalog.js')) {
   const manualTag = '    <script src="pfc-database-v3-manual.js?v=300"></script>';
@@ -101,7 +103,7 @@ const positions = {
 if (!(positions.v21 >= 0 && positions.verified > positions.v21 && positions.b5 > positions.verified && positions.promoted > positions.b5 && positions.registry > positions.promoted && positions.core > positions.registry && positions.catalog > positions.core && positions.manual > positions.catalog && positions.multi > positions.manual && positions.search > positions.multi && positions.input > positions.search)) {
   throw new Error('Database V3 script ordering is invalid.');
 }
-for (const marker of ['pfc-database-v3-verified.js?v=340','pfc-database-v3-verified-b5.js?v=351','pfc-database-v3-mext-promoted.js?v=380','pfc-food-master-mext-registry.js?v=400','pfc-database-v3-catalog.js?v=312','pfc-database-v3-multiunit.js?v=360','pfc-database-v3-search.js?v=370']) {
+for (const marker of ['pfc-database-v3-verified.js?v=340','pfc-database-v3-verified-b5.js?v=351','pfc-database-v3-mext-promoted.js?v=380',`pfc-food-master-mext-registry.js?v=${registryCache}`,'pfc-database-v3-catalog.js?v=312','pfc-database-v3-multiunit.js?v=360','pfc-database-v3-search.js?v=370']) {
   if (!finalHtml.includes(marker)) throw new Error(`Database V3 cache version is stale: ${marker}`);
 }
 
@@ -110,4 +112,4 @@ if (!fs.existsSync(runtimeApply)) throw new Error(`Food Master runtime apply scr
 const runtimeResult = spawnSync(process.execPath, [runtimeApply], { stdio: 'inherit' });
 if (runtimeResult.status !== 0) throw new Error('Food Master runtime build step failed');
 
-console.log('Food Master V4 central MEXT registry + Database V3 verified/units/search/runtime applied.');
+console.log(`Food Master V4 central MEXT registry (${registryCache}) + Database V3 verified/units/search/runtime applied.`);
