@@ -94,9 +94,14 @@ assert.match(eggRef.note, /可食部gへの自動換算には使わない/);
 
 console.log('Database V3 natural-unit catalog tests passed.');
 
-// The normal CI already invokes this catalog test, so chain the verified-food suite here.
 const verifiedPath = path.join(path.dirname(corePath), 'pfc-database-v3-verified.js');
 if (!fs.existsSync(verifiedPath)) throw new Error(`Verified DB V3 layer missing: ${verifiedPath}`);
 const verifiedTest = path.join(process.cwd(), 'scripts', 'test-database-v3-verified.mjs');
-const child = spawnSync(process.execPath, [verifiedTest, verifiedPath, corePath, catalogPath], { stdio: 'inherit' });
-if (child.status !== 0) throw new Error('Database V3 verified-food test suite failed');
+const primary = spawnSync(process.execPath, [verifiedTest, verifiedPath, corePath, catalogPath], { stdio: 'inherit' });
+if (primary.status !== 0) throw new Error('Database V3 verified-food test suite failed');
+
+const b5Path = path.join(path.dirname(corePath), 'pfc-database-v3-verified-b5.js');
+if (!fs.existsSync(b5Path)) throw new Error(`Database V3 B5 layer missing: ${b5Path}`);
+const b5Test = path.join(process.cwd(), 'scripts', 'test-database-v3-b5.mjs');
+const b5 = spawnSync(process.execPath, [b5Test, verifiedPath, b5Path, corePath, catalogPath], { stdio: 'inherit' });
+if (b5.status !== 0) throw new Error('Database V3 B5 verified-food test suite failed');
