@@ -11,15 +11,19 @@ const sourceV21Css = path.join(root, 'overrides', 'pfc-v21.css');
 const sourceDummyV22Js = path.join(root, 'overrides', 'pfc-dummy-v22.js');
 const sourceModelSelectorV23Js = path.join(root, 'overrides', 'pfc-model-selector-v23.js');
 const sourceModelBridgeV23Js = path.join(root, 'overrides', 'pfc-model-selector-bridge-v23.js');
+const sourceInputV24Js = path.join(root, 'overrides', 'pfc-input-v24.js');
+const sourceInputV24Css = path.join(root, 'overrides', 'pfc-input-v24.css');
 const outputV21Js = path.join(dist, 'pfc-v21.js');
 const outputV21SearchFixJs = path.join(dist, 'pfc-v21-search-fix.js');
 const outputV21Css = path.join(dist, 'pfc-v21.css');
 const outputDummyV22Js = path.join(dist, 'pfc-dummy-v22.js');
 const outputModelSelectorV23Js = path.join(dist, 'pfc-model-selector-v23.js');
 const outputModelBridgeV23Js = path.join(dist, 'pfc-model-selector-bridge-v23.js');
+const outputInputV24Js = path.join(dist, 'pfc-input-v24.js');
+const outputInputV24Css = path.join(dist, 'pfc-input-v24.css');
 
 if (!fs.existsSync(dist)) throw new Error('dist/ is missing; build mirror first.');
-for (const required of [sourceAvatar, sourceV21Js, sourceV21SearchFixJs, sourceV21Css, sourceDummyV22Js, sourceModelSelectorV23Js, sourceModelBridgeV23Js]) {
+for (const required of [sourceAvatar, sourceV21Js, sourceV21SearchFixJs, sourceV21Css, sourceDummyV22Js, sourceModelSelectorV23Js, sourceModelBridgeV23Js, sourceInputV24Js, sourceInputV24Css]) {
   if (!fs.existsSync(required)) throw new Error(`Mirror overlay source missing: ${required}`);
 }
 
@@ -30,6 +34,8 @@ fs.copyFileSync(sourceV21Css, outputV21Css);
 fs.copyFileSync(sourceDummyV22Js, outputDummyV22Js);
 fs.copyFileSync(sourceModelSelectorV23Js, outputModelSelectorV23Js);
 fs.copyFileSync(sourceModelBridgeV23Js, outputModelBridgeV23Js);
+fs.copyFileSync(sourceInputV24Js, outputInputV24Js);
+fs.copyFileSync(sourceInputV24Css, outputInputV24Css);
 
 const htmlPath = path.join(dist, 'index.html');
 let html = fs.readFileSync(htmlPath, 'utf8');
@@ -41,6 +47,9 @@ html = html
 
 if (!html.includes('pfc-v21.css')) {
   html = html.replace('</head>', '    <link rel="stylesheet" href="pfc-v21.css?v=210">\n</head>');
+}
+if (!html.includes('pfc-input-v24.css')) {
+  html = html.replace('</head>', '    <link rel="stylesheet" href="pfc-input-v24.css?v=240">\n</head>');
 }
 if (!html.includes('pfc-v21.js')) {
   html = html.replace('</body>', '    <script src="pfc-v21.js?v=210"></script>\n</body>');
@@ -57,6 +66,9 @@ if (!html.includes('pfc-model-selector-bridge-v23.js')) {
 if (!html.includes('pfc-model-selector-v23.js')) {
   html = html.replace('</body>', '    <script src="pfc-model-selector-v23.js?v=230"></script>\n</body>');
 }
+if (!html.includes('pfc-input-v24.js')) {
+  html = html.replace('</body>', '    <script src="pfc-input-v24.js?v=240"></script>\n</body>');
+}
 fs.writeFileSync(htmlPath, html, 'utf8');
 
 const aiPath = path.join(dist, 'ai.js');
@@ -70,7 +82,7 @@ fs.writeFileSync(aiPath, ai, 'utf8');
 const stylePath = path.join(dist, 'style.css');
 fs.appendFileSync(stylePath, `\n/* Mirror: Obayashi trainer AI avatar + dynamic model selector */\n#tama-chat-btn img, .msg.bot .icon img {\n  object-fit: contain !important;\n  object-position: center center !important;\n  background: #fff;\n}\n#tama-chat-btn img {\n  transform: scale(1.08);\n}\n.user-chat-icon {\n  width: 100%;\n  height: 100%;\n  border-radius: 50%;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  background: #eef2f5;\n  color: #607080;\n  font-size: 9px;\n  font-weight: 800;\n}\n.model-picker-row-v23 {\n  flex-wrap: wrap;\n}\n.model-picker-actions-v23 {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex: 1 1 100%;\n  margin-top: 7px;\n}\n.model-picker-actions-v23 #ai-model-select {\n  flex: 1 1 auto;\n  min-width: 0;\n  width: auto !important;\n}\n.model-rate-limit-btn-v23 {\n  flex: 0 0 auto;\n  border: 1px solid #cfe7dd;\n  background: #f4fbf8;\n  color: #167a59;\n  border-radius: 9px;\n  padding: 7px 10px;\n  font-size: 12px;\n  font-weight: 800;\n  cursor: pointer;\n  white-space: nowrap;\n}\n.model-picker-meta-v23 {\n  flex: 1 1 100%;\n  font-size: 10px;\n  color: #738079;\n  margin-top: 4px;\n  line-height: 1.35;\n}\n`, 'utf8');
 
-for (const required of [outputAvatar, outputV21Js, outputV21SearchFixJs, outputV21Css, outputDummyV22Js, outputModelSelectorV23Js, outputModelBridgeV23Js, htmlPath, aiPath, stylePath]) {
+for (const required of [outputAvatar, outputV21Js, outputV21SearchFixJs, outputV21Css, outputDummyV22Js, outputModelSelectorV23Js, outputModelBridgeV23Js, outputInputV24Js, outputInputV24Css, htmlPath, aiPath, stylePath]) {
   if (!fs.existsSync(required)) throw new Error(`Mirror overlay output missing: ${required}`);
 }
 const finalHtml = fs.readFileSync(htmlPath, 'utf8');
@@ -81,6 +93,8 @@ const finalV21Css = fs.readFileSync(outputV21Css, 'utf8');
 const finalDummyV22Js = fs.readFileSync(outputDummyV22Js, 'utf8');
 const finalModelSelectorV23Js = fs.readFileSync(outputModelSelectorV23Js, 'utf8');
 const finalModelBridgeV23Js = fs.readFileSync(outputModelBridgeV23Js, 'utf8');
+const finalInputV24Js = fs.readFileSync(outputInputV24Js, 'utf8');
+const finalInputV24Css = fs.readFileSync(outputInputV24Css, 'utf8');
 if (!finalHtml.includes('大林トレーナーAI')) throw new Error('Trainer AI title was not applied.');
 if (!finalAi.includes('trainer-ai-avatar.webp')) throw new Error('Dynamic chat avatar was not applied.');
 if (!finalHtml.includes('pfc-v21.js') || !finalHtml.includes('pfc-v21-search-fix.js') || !finalHtml.includes('pfc-v21.css')) {
@@ -89,6 +103,9 @@ if (!finalHtml.includes('pfc-v21.js') || !finalHtml.includes('pfc-v21-search-fix
 if (!finalHtml.includes('pfc-dummy-v22.js')) throw new Error('PFC dummy V2.2 asset was not injected.');
 if (!finalHtml.includes('pfc-model-selector-v23.js') || !finalHtml.includes('pfc-model-selector-bridge-v23.js')) {
   throw new Error('PFC model selector V2.3 assets were not injected.');
+}
+if (!finalHtml.includes('pfc-input-v24.js') || !finalHtml.includes('pfc-input-v24.css')) {
+  throw new Error('PFC non-voice input V2.4 assets were not injected.');
 }
 for (const marker of ['__PFC_SEARCH_V21__', 'smartFilterF', 'DB_EXTENSIONS', "VERSION = '2.1.0'"]) {
   if (!finalV21Js.includes(marker)) throw new Error(`PFC V2.1 JS marker missing: ${marker}`);
@@ -108,5 +125,11 @@ for (const marker of ['__PFC_MODEL_SELECTOR_V23__', "source: 'models.list'", '�
 for (const marker of ['__PFC_MODEL_SELECTOR_BRIDGE_V23__', 'directModelIds: true', 'gemini-3.1-flash-lite']) {
   if (!finalModelBridgeV23Js.includes(marker)) throw new Error(`PFC model bridge V2.3 marker missing: ${marker}`);
 }
+for (const marker of ['__PFC_INPUT_V24__', "VERSION = '2.4.0'", 'previous-meal-copy', 'meal-sets', 'basket', 'quantity-chips', 'time-suggestions', 'smart-command-search', 'undo-adjust']) {
+  if (!finalInputV24Js.includes(marker)) throw new Error(`PFC input V2.4 JS marker missing: ${marker}`);
+}
+for (const marker of ['#pfc-smart-input-v24', '.v24-quick-qty', '#pfc-action-snack-v24', '.v24-basket-box']) {
+  if (!finalInputV24Css.includes(marker)) throw new Error(`PFC input V2.4 CSS marker missing: ${marker}`);
+}
 
-console.log('Trainer AI + PFC V2.1 + realistic dummy V2.2 + dynamic model selector V2.3 overlay applied.');
+console.log('Trainer AI + PFC V2.1 + realistic dummy V2.2 + dynamic model selector V2.3 + non-voice input V2.4 overlay applied.');
