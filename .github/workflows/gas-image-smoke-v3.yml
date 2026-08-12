@@ -1,0 +1,37 @@
+name: GAS image model benchmark
+
+on:
+  push:
+    branches: [agent/gas-image-smoke]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - name: Benchmark image models
+        env:
+          GAS_URL: https://script.google.com/macros/s/AKfycbxRNfeijUEwXwoFgBYbS60S5zn2fcuqHSm4TAbRePUzjTjqInXu10ZmK4cUvxoJ-dCAxw/exec
+        run: |
+          python - <<'PY'
+          import base64,io,json,os,time,urllib.request,urllib.error
+          from PIL import Image
+          im=Image.new('RGB',(64,64),'white'); b=io.BytesIO(); im.save(b,'JPEG',quality=70); jpg=base64.b64encode(b.getvalue()).decode()
+          def probe(label,model,thinking):
+              p={'taskType':'image','modelPreference':model,'contents':[{'parts':[{'text':'{"foods":[]}だけ返してください。'}]}],'imageBase64':jpg,'generationConfig':{'maxOutputTokens':128}}
+              p['generationConfig']['thinkingConfig']=thinking
+              req=urllib.request.Request(os.environ['GAS_URL'],data=json.dumps(p).encode(),headers={'Content-Type':'text/plain'},method='POST'); t=time.perf_counter()
+              try:
+                  with urllib.request.urlopen(req,timeout=55) as r:
+                      body=r.read().decode(errors='replace'); print(json.dumps({'label':label,'model':model,'status':r.status,'sec':round(time.perf_counter()-t,3),'body':body[:1600]},ensure_ascii=False))
+              except urllib.error.HTTPError as e:
+                  print(json.dumps({'label':label,'model':model,'status':e.code,'sec':round(time.perf_counter()-t,3),'body':e.read().decode(errors='replace')[:2000]},ensure_ascii=False))
+              except Exception as e: print(json.dumps({'label':label,'model':model,'sec':round(time.perf_counter()-t,3),'error':repr(e)},ensure_ascii=False))
+          probe('2.5-lite-no-thinking','gemini-2.5-flash-lite',{'thinkingBudget':0})
+          probe('3.6-flash-minimal','gemini-3.6-flash',{'thinkingLevel':'minimal'})
+          probe('3.5-lite-minimal','gemini-3.5-flash-lite',{'thinkingLevel':'minimal'})
+          PY
