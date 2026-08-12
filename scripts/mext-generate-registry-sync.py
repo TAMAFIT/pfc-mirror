@@ -21,13 +21,14 @@ def sync(report,entries):
     by_no={str(e.get('source',{}).get('itemNo')):e for e in entries}
     source=report.get('source') or {}; sha=source.get('sha256')
     verified_at=str(report.get('generatedAt') or datetime.now(timezone.utc).isoformat())[:10]
-    changes=[]; missing=[]
+    changes=[]; missing=[]; metadata=[]
     for row in report.get('entries') or []:
         item=str(row.get('itemNo') or '')
         target=by_no.get(item)
         if not target:
             missing.append(item); continue
         official=row.get('official')
+        nutrition_changed=False
         if official:
             old=dict(target['source'].get('per100g') or {})
             new={
@@ -35,12 +36,17 @@ def sync(report,entries):
                 'c': float(official.get('c') or 0), 'kcal': float(official.get('kcal') or 0),
                 'a': float(official.get('a') or 0)
             }
+            nutrition_changed=old != new
             target['source']['officialName']=official.get('officialName') or target['source'].get('officialName')
             target['source']['per100g']=new
-            if old != new: changes.append({'itemNo':item,'name':target.get('name'),'old':old,'new':new})
-        if sha: target['source']['datasetSha256']=sha
-        target['source']['verifiedAt']=verified_at
-    return changes,missing,sha,verified_at
+            if nutrition_changed: changes.append({'itemNo':item,'name':target.get('name'),'old':old,'new':new})
+        snapshot_changed=bool(sha and target['source'].get('datasetSha256') != sha)
+        if snapshot_changed:
+            target['source']['datasetSha256']=sha
+            metadata.append({'itemNo':item,'name':target.get('name'),'field':'datasetSha256'})
+        if nutrition_changed or snapshot_changed:
+            target['source']['verifiedAt']=verified_at
+    return changes,missing,metadata,sha,verified_at
 
 
 def render(original,match,entries,sha):
@@ -54,12 +60,12 @@ def render(original,match,entries,sha):
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--report',required=True); ap.add_argument('--registry',required=True); ap.add_argument('--write',action='store_true'); ap.add_argument('--out-json',default='mext-registry-sync.json'); args=ap.parse_args()
     report=json.loads(Path(args.report).read_text(encoding='utf-8')); original,match,entries=load_registry(args.registry)
-    changes,missing,sha,verified_at=sync(report,entries); updated=render(original,match,entries,sha)
+    changes,missing,metadata,sha,verified_at=sync(report,entries); updated=render(original,match,entries,sha)
     content_changed=updated != original
     if args.write and content_changed: Path(args.registry).write_text(updated,encoding='utf-8')
-    result={'schemaVersion':1,'registry':args.registry,'contentChanged':content_changed,'nutritionChanges':changes,'missingRegistryItems':missing,'datasetSha256':sha,'verifiedAt':verified_at,'entryCount':len(entries)}
+    result={'schemaVersion':2,'registry':args.registry,'contentChanged':content_changed,'nutritionChanges':changes,'metadataChanges':metadata,'missingRegistryItems':missing,'datasetSha256':sha,'verifiedAt':verified_at,'entryCount':len(entries)}
     Path(args.out_json).write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-    print(f"MEXT_REGISTRY_SYNC changed={str(content_changed).lower()} nutrition={len(changes)} missing={len(missing)} entries={len(entries)}")
+    print(f"MEXT_REGISTRY_SYNC changed={str(content_changed).lower()} nutrition={len(changes)} metadata={len(metadata)} missing={len(missing)} entries={len(entries)}")
     return 2 if missing else 0
 
 if __name__=='__main__': sys.exit(main())
