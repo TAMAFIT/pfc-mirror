@@ -8,6 +8,8 @@ const files = [
   'overrides/pfc-v21.js',
   'overrides/pfc-database-v3-verified.js',
   'overrides/pfc-database-v3-verified-b5.js',
+  'overrides/pfc-database-v3-mext-promoted.js',
+  'overrides/pfc-food-master-mext-registry.js',
   'overrides/pfc-database-v3.js',
   'overrides/pfc-database-v3-catalog.js',
   'overrides/pfc-database-v3-multiunit.js',
@@ -155,6 +157,9 @@ const report = {
     multiunitVersion: multi.version,
     primaryVerifiedVersion: context.__PFC_DB_V3_VERIFIED__?.version,
     b5VerifiedVersion: context.__PFC_DB_V3_VERIFIED_B5__?.version,
+    promotedVersion: context.__PFC_DB_V3_MEXT_PROMOTED__?.version,
+    mextRegistryVersion: context.__PFC_FOOD_MASTER_MEXT_REGISTRY__?.version,
+    mextRegistryCount: context.__PFC_FOOD_MASTER_MEXT_REGISTRY__?.count,
     catalogVersion: context.__PFC_DB_V3_CATALOG__?.version
   }
 };
@@ -168,6 +173,7 @@ console.log(JSON.stringify({
   duplicateRowsSuppressed: report.duplicateRowsSuppressed,
   verifiedCanonicalRows: report.verifiedCanonicalRows,
   verifiedCoveragePercent: report.verifiedCoveragePercent,
+  mextRegistryCount: report.markers.mextRegistryCount,
   multiunitCount: report.multiunitCount,
   lowConfidenceCount: report.lowConfidenceCount,
   suspiciousMealUnits: report.suspiciousMealUnits.length,
