@@ -1,0 +1,37 @@
+name: GAS image smoke v2
+
+on:
+  push:
+    branches: [agent/gas-image-smoke]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - name: Probe 3.5 image variants and 3.1 fallback
+        env:
+          GAS_URL: https://script.google.com/macros/s/AKfycbxRNfeijUEwXwoFgBYbS60S5zn2fcuqHSm4TAbRePUzjTjqInXu10ZmK4cUvxoJ-dCAxw/exec
+        run: |
+          python - <<'PY'
+          import base64, io, json, os, time, urllib.request, urllib.error
+          from PIL import Image
+          im=Image.new('RGB',(64,64),'white'); b=io.BytesIO(); im.save(b,'JPEG',quality=70); jpg=base64.b64encode(b.getvalue()).decode()
+          def probe(label,model,config):
+              p={'taskType':'image','modelPreference':model,'contents':[{'parts':[{'text':'{"foods":[]}だけ返してください。'}]}],'imageBase64':jpg}
+              if config: p['generationConfig']={'thinkingConfig':{'thinkingLevel':'minimal'},'maxOutputTokens':128}
+              req=urllib.request.Request(os.environ['GAS_URL'],data=json.dumps(p).encode(),headers={'Content-Type':'text/plain'},method='POST'); t=time.perf_counter()
+              try:
+                  with urllib.request.urlopen(req,timeout=50) as r:
+                      body=r.read().decode(errors='replace'); print(json.dumps({'label':label,'status':r.status,'sec':round(time.perf_counter()-t,3),'body':body[:1800]},ensure_ascii=False))
+              except urllib.error.HTTPError as e:
+                  body=e.read().decode(errors='replace'); print(json.dumps({'label':label,'status':e.code,'sec':round(time.perf_counter()-t,3),'url':e.geturl(),'body':body[:2400]},ensure_ascii=False))
+              except Exception as e: print(json.dumps({'label':label,'sec':round(time.perf_counter()-t,3),'error':repr(e)},ensure_ascii=False))
+          probe('3.5-no-config','gemini-3.5-flash-lite',False)
+          probe('3.5-minimal','gemini-3.5-flash-lite',True)
+          probe('3.1-minimal','gemini-3.1-flash-lite',True)
+          PY
