@@ -17,6 +17,7 @@ def discover_main_workbook(page=core.MEXT_PAGE):
     parser = core.Links()
     parser.feed(body.decode('utf-8', 'replace'))
     candidates = []
+    seen = []
     for href, label in parser.links:
         if not href:
             continue
@@ -24,12 +25,13 @@ def discover_main_workbook(page=core.MEXT_PAGE):
         if not url.lower().endswith(('.xlsx', '.xls')):
             continue
         normalized = re.sub(r'\s+', '', label).lstrip('・･')
-        # Only the plain main-table link is accepted. This deliberately excludes
-        # amino-acid/fatty-acid/carbohydrate tables such as 第2章本表（データ）.
-        if normalized == '第2章（データ）':
+        seen.append((normalized, url))
+        # The main composition workbook label contains exactly this phrase.
+        # Companion books use forms such as 第2章本表（データ） or 第2章第1表（データ）.
+        if '第2章（データ）' in normalized and all(x not in normalized for x in ('本表', '第1表', '第2表', '第3表', '第4表', '別表')):
             candidates.append((url, label))
     if len(candidates) != 1:
-        raise RuntimeError(f'Expected exactly one MEXT main-table workbook link, found {len(candidates)}: {candidates}')
+        raise RuntimeError(f'Expected exactly one MEXT main-table workbook link, found {len(candidates)}; excel links={seen}')
     return candidates[0]
 
 
