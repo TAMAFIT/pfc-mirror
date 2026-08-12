@@ -20,7 +20,7 @@ let html = fs.readFileSync(htmlPath, 'utf8');
 if (!html.includes('pfc-database-v3-verified.js')) {
   const coreTag = '    <script src="pfc-database-v3.js?v=300"></script>';
   if (!html.includes(coreTag)) throw new Error('Database V3 core script tag was not found.');
-  html = html.replace(coreTag, `    <script src="pfc-database-v3-verified.js?v=320"></script>\n${coreTag}`);
+  html = html.replace(coreTag, `    <script src="pfc-database-v3-verified.js?v=330"></script>\n${coreTag}`);
 }
 if (!html.includes('pfc-database-v3-catalog.js')) {
   const manualTag = '    <script src="pfc-database-v3-manual.js?v=300"></script>';
@@ -30,7 +30,10 @@ if (!html.includes('pfc-database-v3-catalog.js')) {
 fs.writeFileSync(htmlPath, html, 'utf8');
 
 const verified = fs.readFileSync(verifiedOutput, 'utf8');
-for (const marker of ['__PFC_DB_V3_VERIFIED__', "VERSION = '3.2.0'", 'こいくち醤油', '上白糖', '米みそ(淡色辛みそ)', '本みりん']) {
+for (const marker of [
+  '__PFC_DB_V3_VERIFIED__', "VERSION = '3.3.0'", 'こいくち醤油', '本みりん',
+  '豚肩ロース(脂身つき)', '鶏手羽元(皮つき)', 'サバ(生)', 'アジ(生)', 'ピーマン', 'なす', '白菜'
+]) {
   if (!verified.includes(marker)) throw new Error(`Database V3 verified marker missing: ${marker}`);
 }
 const catalog = fs.readFileSync(catalogOutput, 'utf8');
