@@ -60,8 +60,10 @@ jobs:
           test -f dist/pfc-dummy-v22.js
           test -f dist/pfc-model-selector-v23.js
           test -f dist/pfc-model-selector-bridge-v23.js
-          test -f dist/pfc-input-v24.js
-          test -f dist/pfc-input-v24.css
+          test -f dist/pfc-input-v25.js
+          test -f dist/pfc-input-v25.css
+          test ! -f dist/pfc-input-v24.js
+          test ! -f dist/pfc-input-v24.css
           test ! -e dist/gas
           test ! -e dist/.github
           test ! -e dist/.voicedev
@@ -74,7 +76,7 @@ jobs:
           node --check dist/pfc-dummy-v22.js
           node --check dist/pfc-model-selector-v23.js
           node --check dist/pfc-model-selector-bridge-v23.js
-          node --check dist/pfc-input-v24.js
+          node --check dist/pfc-input-v25.js
           grep -q 'PFC Mirror' dist/manifest.json
           grep -q '#22a06b' dist/manifest.json
           grep -q 'pfc-mirror:v1:' dist/mirror-storage.js
@@ -91,8 +93,9 @@ jobs:
           grep -q 'pfc-dummy-v22.js' dist/index.html
           grep -q 'pfc-model-selector-v23.js' dist/index.html
           grep -q 'pfc-model-selector-bridge-v23.js' dist/index.html
-          grep -q 'pfc-input-v24.js' dist/index.html
-          grep -q 'pfc-input-v24.css' dist/index.html
+          grep -q 'pfc-input-v25.js' dist/index.html
+          grep -q 'pfc-input-v25.css' dist/index.html
+          ! grep -q 'pfc-input-v24' dist/index.html
           grep -q '__PFC_SEARCH_V21__' dist/pfc-v21.js
           grep -q "VERSION = '2.1.0'" dist/pfc-v21.js
           grep -q '__PFC_SEARCH_V21_BROAD__' dist/pfc-v21-search-fix.js
@@ -105,14 +108,13 @@ jobs:
           grep -q '上限を見る' dist/pfc-model-selector-v23.js
           grep -q '__PFC_MODEL_SELECTOR_BRIDGE_V23__' dist/pfc-model-selector-bridge-v23.js
           grep -q 'directModelIds: true' dist/pfc-model-selector-bridge-v23.js
-          grep -q '__PFC_INPUT_V24__' dist/pfc-input-v24.js
-          grep -q "VERSION = '2.4.0'" dist/pfc-input-v24.js
-          grep -q 'previous-meal-copy' dist/pfc-input-v24.js
-          grep -q 'meal-sets' dist/pfc-input-v24.js
-          grep -q 'smart-command-search' dist/pfc-input-v24.js
-          grep -q '#pfc-smart-input-v24' dist/pfc-input-v24.css
-          grep -q '.v24-quick-qty' dist/pfc-input-v24.css
-          grep -q '#pfc-action-snack-v24' dist/pfc-input-v24.css
+          grep -q '__PFC_INPUT_V25__' dist/pfc-input-v25.js
+          grep -q "VERSION = '2.5.0'" dist/pfc-input-v25.js
+          grep -q 'visibleSmartPanel: false' dist/pfc-input-v25.js
+          grep -q 'quickStepper: true' dist/pfc-input-v25.js
+          grep -q 'smartCommandSearch: true' dist/pfc-input-v25.js
+          grep -q '.v25-stepper' dist/pfc-input-v25.css
+          grep -q '.v25-command-hit' dist/pfc-input-v25.css
           grep -q '.btn-voice-main' dist/pfc-v21.css
           grep -q '#voice-ui-window' dist/pfc-v21.css
           ! grep -q '🥚 たまちゃんコーチ' dist/index.html
