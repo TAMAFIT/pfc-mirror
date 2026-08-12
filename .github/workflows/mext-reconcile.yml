@@ -150,7 +150,7 @@ jobs:
           git commit -m 'Sync Food Master with current MEXT'
           git push --force origin "$SYNC_BRANCH"
 
-          cat > /tmp/mext-sync-pr.md <<EOF
+          cat > /tmp/mext-sync-pr.md <<'EOF'
           ## Automated MEXT Food Master sync
 
           The scheduled official-source reconciliation detected a new MEXT snapshot and/or nutrition drift and generated this review-only update.
