@@ -1,0 +1,121 @@
+name: MEXT Food Master Reconcile
+
+on:
+  pull_request:
+    paths:
+      - 'overrides/pfc-database-v3-verified*.js'
+      - 'scripts/mext-reconcile.py'
+      - 'scripts/mext-reconcile-identifiers.py'
+      - 'scripts/test-mext-reconcile.py'
+      - '.github/workflows/mext-reconcile.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 21 * * 1'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout mirror controls
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install workbook parser
+        run: python -m pip install --disable-pip-version-check 'openpyxl>=3.1,<4'
+
+      - name: Test reconciliation parser
+        run: python scripts/test-mext-reconcile.py
+
+      - name: Reconcile current MEXT-backed foods
+        id: reconcile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/mext-reconcile-identifiers.py \
+            --verified overrides/pfc-database-v3-verified.js \
+            --verified overrides/pfc-database-v3-verified-b5.js \
+            --out-json mext-reconcile-report.json \
+            --out-md mext-reconcile-report.md
+
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          r=json.load(open('mext-reconcile-report.json', encoding='utf-8'))
+          print(f"checked={r['checked']}")
+          print(f"confirmed={r['confirmed']}")
+          print(f"drift={r['drift']}")
+          print(f"missing={r['missing']}")
+          print(f"sha256={r['source']['sha256']}")
+          print(f"workbook_url={r['source']['workbookUrl']}")
+          PY
+
+      - name: Publish reconciliation summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -s mext-reconcile-report.md ]; then
+            cat mext-reconcile-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'MEXT reconciliation did not produce a report.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mext-food-master-reconcile
+          path: |
+            mext-reconcile-report.json
+            mext-reconcile-report.md
+          if-no-files-found: warn
+
+      - name: Comment pull request
+        if: github.event_name == 'pull_request' && always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          if [ -s mext-reconcile-report.md ]; then
+            {
+              echo '<!-- pfc-mext-reconcile -->'
+              cat mext-reconcile-report.md
+              echo
+              echo '_Official MEXT workbook is discovered from the current MEXT publication page on every run._'
+            } > /tmp/mext-pr-comment.md
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/mext-pr-comment.md --edit-last --create-if-none
+          fi
+
+      - name: Open or refresh scheduled drift issue
+        if: github.event_name != 'pull_request' && (steps.reconcile.outputs.drift != '0' || steps.reconcile.outputs.missing != '0')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo '<!-- pfc-mext-reconcile-drift -->'
+            cat mext-reconcile-report.md
+            echo
+            echo "Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > /tmp/mext-issue.md
+          ISSUE=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'MEXT Food Master reconciliation drift in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$ISSUE" ]; then
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file /tmp/mext-issue.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title '[MEXT] Food Master reconciliation drift' --body-file /tmp/mext-issue.md
+          fi
+
+      - name: Enforce official parity on pull requests
+        if: github.event_name == 'pull_request' && (steps.reconcile.outputs.drift != '0' || steps.reconcile.outputs.missing != '0')
+        run: |
+          echo 'MEXT-backed Food Master entries are not in parity with the current official workbook.' >&2
+          exit 1
