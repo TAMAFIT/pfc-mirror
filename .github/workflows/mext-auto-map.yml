@@ -1,0 +1,99 @@
+name: MEXT Food Master Auto Map
+
+on:
+  pull_request:
+    paths:
+      - 'overrides/pfc-database-v3*.js'
+      - 'scripts/export-effective-food-master.mjs'
+      - 'scripts/mext-map-food-master.py'
+      - 'scripts/test-mext-map-food-master.py'
+      - 'scripts/mext-reconcile*.py'
+      - '.github/workflows/mext-auto-map.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '47 21 * * 1'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout mirror controls
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned PFC source read-only
+        uses: actions/checkout@v4
+        with:
+          repository: TAMAFIT/pfc
+          ref: cf2d53990860a108d96596abc6eed81e0afd32ae
+          path: _source_pfc
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install MEXT workbook parser
+        run: python -m pip install --disable-pip-version-check 'openpyxl>=3.1,<4'
+
+      - name: Export effective canonical Food Master
+        run: node scripts/export-effective-food-master.mjs _source_pfc/database.js food-master-effective.json
+
+      - name: Test mapping safety gates
+        run: python scripts/test-mext-map-food-master.py
+
+      - name: Map Food Master to current official MEXT dataset
+        id: mapping
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/mext-map-food-master.py \
+            --food-master food-master-effective.json \
+            --out-json mext-food-master-map.json \
+            --out-md mext-food-master-map.md
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          r=json.load(open('mext-food-master-map.json',encoding='utf-8'))
+          for key in ('already-mext','high','review','mext-unlikely','external-source','unmapped'):
+              print(f"{key.replace('-','_')}={r['counts'].get(key,0)}")
+          print(f"canonical={r['canonicalRows']}")
+          print(f"sha256={r['source']['sha256']}")
+          PY
+
+      - name: Publish mapping summary
+        if: always()
+        run: |
+          if [ -s mext-food-master-map.md ]; then cat mext-food-master-map.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload mapping evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mext-food-master-auto-map
+          path: |
+            food-master-effective.json
+            mext-food-master-map.json
+            mext-food-master-map.md
+          if-no-files-found: error
+
+      - name: Comment pull request
+        if: github.event_name == 'pull_request' && always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          if [ -s mext-food-master-map.md ]; then
+            { echo '<!-- pfc-mext-auto-map -->'; cat mext-food-master-map.md; } > /tmp/mext-map-comment.md
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/mext-map-comment.md --edit-last --create-if-none
+          fi
