@@ -137,8 +137,8 @@ replaceOnce(
   'strict specificity marker'
 );
 replaceOnce(
-  'resolveFoods,\n    buildRequestPayload,',
-  'resolveFoods,\n    identityPrompt,\n    buildRequestPayload,',
+  'buildRequestPayload,\n    extractAiText,',
+  'identityPrompt,\n    buildRequestPayload,\n    extractAiText,',
   'prompt diagnostics export'
 );
 
