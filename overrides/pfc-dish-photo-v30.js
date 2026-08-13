@@ -11,6 +11,7 @@
   const REQUEST_TIMEOUT_MS = 32000;
   const RETRY_DELAY_MS = 700;
   const COUNT_UNITS = /^(個|切れ|枚|本|玉|杯|粒|袋|パック|カップ|缶|食)$/;
+  const CUT_STYLE_WORDS = ['千切り','細切り','薄切り','輪切り','角切り','短冊切り','拍子木切り','みじん切り','花形','飾り切り'];
   let busy = false;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -18,6 +19,16 @@
   const norm = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/\s+/g, '').trim();
   const baseName = value => norm(value).replace(/[（(].*?[)）]/g, '');
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  function cleanVisualFoodName(value) {
+    const original = String(value || '').trim();
+    let cleaned = original;
+    for (const word of CUT_STYLE_WORDS) {
+      cleaned = cleaned.replace(new RegExp('^' + word + '[の・\\s]*'), '');
+      cleaned = cleaned.replace(new RegExp('[の・\\s]*' + word + '$'), '');
+    }
+    return cleaned.trim() || original;
+  }
 
   function parseVisibleCount(value) {
     const n = Math.round(Number(value));
@@ -33,13 +44,15 @@
     const text = String(raw ?? '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/,'').trim();
     let data;
     try { data = JSON.parse(text); } catch { return null; }
-    const source = Array.isArray(data) ? data : data?.foods;
+    const root = Array.isArray(data) && data.length === 1 && data[0] && Array.isArray(data[0].foods) ? data[0] : data;
+    const source = Array.isArray(root) ? root : root?.foods;
     if (!Array.isArray(source)) return null;
     const seen = new Map();
     const foods = [];
     for (const item of source) {
       const object = typeof item === 'object' && item ? item : {};
-      const name = String(typeof item === 'string' ? item : object.name || '').trim();
+      const rawName = String(typeof item === 'string' ? item : object.name || '').trim();
+      const name = cleanVisualFoodName(rawName);
       if (!name || name.length > 40) continue;
       const key = norm(name);
       const parsed = {
@@ -47,7 +60,7 @@
         confidence: Math.max(0, Math.min(1, num(typeof item === 'string' ? 0 : object.confidence))),
         visibleCount: parseVisibleCount(object.visibleCount),
         ambiguity: String(object.ambiguity || '').trim().slice(0, 100),
-        note: String(object.note || '').trim().slice(0, 100),
+        note: String(object.note || (rawName !== name ? `見た目表記: ${rawName}` : '')).trim().slice(0, 100),
         rawCountCertain: object.countCertain === true,
         rawVariantVisible: object.variantVisible === true
       };
@@ -67,8 +80,8 @@
     }
     return {
       foods,
-      dishName: String(data?.dishName || '').slice(0,80),
-      uncertain: !!data?.uncertain
+      dishName: String(root?.dishName || '').slice(0,80),
+      uncertain: !!root?.uncertain
     };
   }
 
@@ -298,80 +311,163 @@
     return parts.join(' · ');
   }
 
-  function showMatches(identity) {
-    const resolved = resolveFoods(identity);
-    const matched = resolved.filter(x => x.match);
-    const unmatched = resolved.filter(x => !x.match);
+  function dbSearch(query, limit = 18) {
+    const search = window.__PFC_DB_V3_SEARCH__?.search;
+    if (typeof search !== 'function') return [];
+    const q = String(query || '').trim();
+    if (!q) return [];
+    return search(q, limit).filter(x => x?.source === 'db');
+  }
 
-    if (!matched.length) {
-      const names = unmatched.map(x => `${esc(x.ai.name)}${x.ai.visibleCount ? ` ×${x.ai.visibleCount}候補` : ''}`).join('、');
-      const host = modal('食品を確認してください', `<div class="dish-v30-message">AIは ${names || '食品'} を認識しましたが、Food Masterの特定食品へ安全に自動一致できませんでした。具・種類・量を勝手に補完しないため、この結果は記録しません。</div><button class="dish-v30-primary" id="dish-v30-close-result">閉じる</button>`);
-      host.querySelector('#dish-v30-close-result').onclick = () => host.classList.remove('show');
-      return;
-    }
+  function applyDbMatch(row, result) {
+    const meta = result?.meta || window.__PFC_DB_V3__?.get?.(result?.index);
+    if (!result || !meta) return { ...row, match:null, meta:null, unit:'', countSuggestion:null };
+    const unit = String(meta.input?.defaultUnit || meta.nutritionBasis?.unit || '');
+    const countSuggestion = row?.ai?.visibleCount && COUNT_UNITS.test(unit) ? row.ai.visibleCount : null;
+    return { ...row, match:result, meta, unit, countSuggestion, countApplied:false };
+  }
 
-    const cards = matched.map((row,i) => {
-      const unit = row.unit || row.meta.input?.defaultUnit || row.meta.nutritionBasis?.unit || '食';
-      const placeholder = row.countSuggestion ? String(row.countSuggestion) : '量を入力';
-      const countNote = row.countSuggestion
-        ? `<small class="dish-v30-note">AIの個数候補は ${row.countSuggestion}${esc(unit)}。未確定なので自動入力していません。</small>`
-        : '<small class="dish-v30-note">写真から重量・量は確定しません。実際の量を入力してください。</small>';
-      return `<label class="dish-v30-card" data-row="${i}"><div class="dish-v30-card-head"><input class="dish-v30-check" type="checkbox" checked><div><b>${esc(row.match.name)}</b><small>${esc(aiMetaText(row.ai,row.countSuggestion))}</small></div></div><div class="dish-v30-amount"><input class="dish-v30-amount-input" type="number" min="0.1" step="0.1" value="" placeholder="${esc(placeholder)}"><span>${esc(unit)}</span></div><div class="dish-v30-pfc">${esc(nutritionPreview(row))}</div>${countNote}</label>`;
-    }).join('');
+  function editorRows(identity) {
+    return resolveFoods(identity).map((row, index) => ({ ...row, id:`ai-${index}`, manualDb:false }));
+  }
 
-    const unmatchedHtml = unmatched.length ? `<div class="dish-v30-message"><b>種類の確認が必要な食品</b><br>${unmatched.map(x => `${esc(x.ai.name)}${x.ai.visibleCount?` ×${x.ai.visibleCount}候補`:''}${x.ai.ambiguity?`（${esc(x.ai.ambiguity)}）`:''}`).join('、')}<br><small>Food Masterの特定バリエーションへ自動変換していません。例: 「おにぎり」から「ツナおにぎり」へは変換しません。</small></div>` : '';
-    const host = modal('写真認識を確認', `${identity.dishName?`<div class="dish-v30-badge">AI判定: ${esc(identity.dishName)}</div>`:''}${cards}${unmatchedHtml}<div class="dish-v30-note">AIの個数・種類は候補です。量を確認した食品だけ追加できます。</div><button class="dish-v30-primary" id="dish-v30-add" disabled>量を確認した食品を追加</button>`);
+  function editorRowFromDb(result, index = 0) {
+    const ai = { name:String(result?.name || ''), visibleCount:null, ambiguity:'', note:'', confidence:0 };
+    return applyDbMatch({ ai, match:null, meta:null, unit:'', amount:null, countSuggestion:null, countApplied:false, id:`db-${Date.now()}-${index}`, manualDb:true }, result);
+  }
 
-    const addButton = host.querySelector('#dish-v30-add');
-    const refreshAddState = () => {
-      const cardsNow = [...host.querySelectorAll('.dish-v30-card')];
-      addButton.disabled = !cardsNow.some(card => card.querySelector('.dish-v30-check').checked && parseAmount(card.querySelector('.dish-v30-amount-input').value));
+  function dbResultMeta(result) {
+    const meta = result?.meta || window.__PFC_DB_V3__?.get?.(result?.index);
+    if (!meta) return '';
+    const unit = meta.input?.defaultUnit || meta.nutritionBasis?.unit || '';
+    const amount = meta.input?.defaultAmount || meta.nutritionBasis?.amount || '';
+    const scaled = window.__PFC_DB_V3__?.scale?.(result.index, Number(amount));
+    return [unit ? `基準 ${amount}${unit}` : '', scaled ? `${scaled.kcal} kcal` : ''].filter(Boolean).join(' · ');
+  }
+
+  function ensureDbPicker() {
+    let picker = document.getElementById('dish-v30-db-picker');
+    if (picker) return picker;
+    picker = document.createElement('div');
+    picker.id = 'dish-v30-db-picker';
+    picker.className = 'dish-v30-db-picker';
+    picker.innerHTML = '<div class="dish-v30-db-sheet"><div class="dish-v30-db-head"><strong>Food Masterから選択</strong><button type="button" id="dish-v30-db-close" aria-label="閉じる">×</button></div><input id="dish-v30-db-query" class="dish-v30-db-query" type="search" placeholder="食品名を検索"><div id="dish-v30-db-results" class="dish-v30-db-results"></div></div>';
+    document.body.appendChild(picker);
+    const close = () => picker.classList.remove('show');
+    picker.querySelector('#dish-v30-db-close').onclick = close;
+    picker.addEventListener('click', e => { if (e.target === picker) close(); });
+    return picker;
+  }
+
+  function openDbPicker(initialQuery, onPick) {
+    const picker = ensureDbPicker();
+    const input = picker.querySelector('#dish-v30-db-query');
+    const resultsHost = picker.querySelector('#dish-v30-db-results');
+    const render = () => {
+      const results = dbSearch(input.value, 18);
+      resultsHost.innerHTML = results.length
+        ? results.map((result, i) => `<button type="button" class="dish-v30-db-result" data-db-row="${i}"><b>${esc(result.name)}</b><small>${esc(dbResultMeta(result))}</small></button>`).join('')
+        : '<div class="dish-v30-db-empty">食品名を入力してFood Masterを検索してください。</div>';
+      resultsHost.querySelectorAll('.dish-v30-db-result').forEach(button => {
+        button.onclick = () => {
+          const result = results[Number(button.dataset.dbRow)];
+          if (!result) return;
+          picker.classList.remove('show');
+          onPick(result);
+        };
+      });
     };
+    input.value = String(initialQuery || '');
+    input.oninput = render;
+    render();
+    picker.classList.add('show');
+    setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 0);
+  }
 
-    host.querySelectorAll('.dish-v30-card').forEach((card,i) => {
-      const input = card.querySelector('.dish-v30-amount-input');
-      const check = card.querySelector('.dish-v30-check');
-      input.oninput = () => {
-        matched[i].amount = parseAmount(input.value);
-        card.querySelector('.dish-v30-pfc').textContent = nutritionPreview(matched[i]);
-        refreshAddState();
+  function showMatches(identity) {
+    const state = { rows:editorRows(identity) };
+    const renderEditor = () => {
+      const cards = state.rows.map((row, i) => {
+        const matched = !!row.match;
+        const title = matched ? row.match.name : row.ai.name;
+        const unit = matched ? (row.unit || row.meta?.input?.defaultUnit || row.meta?.nutritionBasis?.unit || '食') : '';
+        const status = matched ? aiMetaText(row.ai,row.countSuggestion) : `AI認識: ${row.ai.name}${row.ai.visibleCount ? ` · 個数候補 ${row.ai.visibleCount}` : ''}${row.ai.ambiguity ? ` · 要確認: ${row.ai.ambiguity}` : ''}`;
+        const amountHtml = matched
+          ? `<div class="dish-v30-amount"><input class="dish-v30-amount-input" type="number" min="0.1" step="0.1" value="${row.amount || ''}" placeholder="量を入力"><span>${esc(unit)}</span>${row.countSuggestion ? `<button type="button" class="dish-v30-use-count">候補${row.countSuggestion}${esc(unit)}</button>` : ''}</div><div class="dish-v30-pfc">${esc(nutritionPreview(row))}</div>`
+          : '<div class="dish-v30-unmatched">Food Masterの食品を選ぶと量とP/F/C/kcalを入力できます。</div>';
+        return `<div class="dish-v30-card dish-v30-editor-card${matched ? '' : ' is-unmatched'}" data-row="${i}"><div class="dish-v30-editor-head"><div><b>${esc(title)}</b><small>${esc(status)}</small></div><button type="button" class="dish-v30-delete" aria-label="カードを削除">×</button></div>${amountHtml}<div class="dish-v30-card-actions"><button type="button" class="dish-v30-change-db">${matched ? 'DBから変更' : 'DBから選ぶ'}</button></div></div>`;
+      }).join('');
+      const badge = identity.dishName ? `<div class="dish-v30-badge">AI判定: ${esc(identity.dishName)}</div>` : '';
+      const empty = '<div class="dish-v30-message">食品カードがありません。</div>';
+      const host = modal('写真認識を確認', `${badge}<div id="dish-v30-editor">${cards || empty}</div><button type="button" class="dish-v30-secondary" id="dish-v30-add-db">＋ DBから食品を追加</button><div class="dish-v30-note">AIが拾った食品はすべてカードとして残しています。不要なカードは削除し、種類が違うものはDBから変更できます。量を入力したカードだけ記録します。</div><button class="dish-v30-primary" id="dish-v30-add" disabled>量を入力した食品を追加</button>`);
+      const addButton = host.querySelector('#dish-v30-add');
+      const refreshAddState = () => { addButton.disabled = !state.rows.some(row => row.match && parseAmount(row.amount)); };
+
+      host.querySelectorAll('.dish-v30-editor-card').forEach((card, i) => {
+        const row = state.rows[i];
+        card.querySelector('.dish-v30-delete').onclick = () => { state.rows.splice(i,1); renderEditor(); };
+        card.querySelector('.dish-v30-change-db').onclick = () => {
+          openDbPicker(row.match?.name || row.ai?.name || '', result => {
+            state.rows[i] = applyDbMatch({ ...row, amount:null }, result);
+            renderEditor();
+          });
+        };
+        const input = card.querySelector('.dish-v30-amount-input');
+        if (input) input.oninput = () => {
+          row.amount = parseAmount(input.value);
+          card.querySelector('.dish-v30-pfc').textContent = nutritionPreview(row);
+          refreshAddState();
+        };
+        const useCount = card.querySelector('.dish-v30-use-count');
+        if (useCount) useCount.onclick = () => {
+          row.amount = row.countSuggestion;
+          if (input) input.value = String(row.countSuggestion);
+          card.querySelector('.dish-v30-pfc').textContent = nutritionPreview(row);
+          refreshAddState();
+        };
+      });
+
+      host.querySelector('#dish-v30-add-db').onclick = () => {
+        openDbPicker('', result => {
+          state.rows.push(editorRowFromDb(result,state.rows.length));
+          renderEditor();
+        });
       };
-      check.onchange = refreshAddState;
-    });
 
-    addButton.onclick = () => {
-      const records = [];
-      host.querySelectorAll('.dish-v30-card').forEach((card,i) => {
-        if (!card.querySelector('.dish-v30-check').checked) return;
-        const row = matched[i];
-        const amount = parseAmount(card.querySelector('.dish-v30-amount-input').value);
-        if (!amount) return;
-        const record = window.__PFC_DB_V3__?.buildRecord?.(row.match.index, amount);
-        if (record) {
+      addButton.onclick = () => {
+        const records = [];
+        for (const row of state.rows) {
+          const amount = parseAmount(row.amount);
+          if (!row.match || !amount) continue;
+          const record = window.__PFC_DB_V3__?.buildRecord?.(row.match.index, amount);
+          if (!record) continue;
           record._photoAI = {
             version:VERSION,
             identityOnly:true,
             model:MODEL,
             thinkingLevel:THINKING_LEVEL,
-            aiName:row.ai.name,
+            aiName:row.manualDb ? '' : row.ai.name,
             visualConfidence:row.ai.confidence,
             visibleCountSuggestion:row.ai.visibleCount,
             ambiguity:row.ai.ambiguity || '',
             userConfirmedAmount:amount,
+            manualDbSelected:!!row.manualDb,
             aiAmountAutoApplied:false,
             aiVariantFlagsTrusted:false
           };
           records.push(record);
         }
-      });
-      if (!records.length || typeof lst === 'undefined' || !Array.isArray(lst)) return;
-      lst.push(...records);
-      if (typeof sv === 'function') sv();
-      if (typeof ren === 'function') ren();
-      if (typeof upd === 'function') upd();
-      if (typeof showToast === 'function') showToast(`${records.length}件を確認して追加しました`);
-      host.classList.remove('show');
+        if (!records.length || typeof lst === 'undefined' || !Array.isArray(lst)) return;
+        lst.push(...records);
+        if (typeof sv === 'function') sv();
+        if (typeof ren === 'function') ren();
+        if (typeof upd === 'function') upd();
+        if (typeof showToast === 'function') showToast(`${records.length}件を確認して追加しました`);
+        host.classList.remove('show');
+      };
+      refreshAddState();
     };
+    renderEditor();
   }
 
   async function runDishPhoto(file) {
@@ -417,14 +513,22 @@
     aiAmountAutoApplied:false,
     aiVariantFlagsTrusted:false,
     requiresUserAmount:true,
+    editablePhotoCards:true,
+    dbPicker:true,
+    removablePhotoCards:true,
     latencyOptimized:true,
     retryTransient:true,
     cameraRoll:true,
     camera:true,
     parseIdentityResponse,
+    cleanVisualFoodName,
     isUnsafeSpecificMatch,
     resolveFood,
     resolveFoods,
+    dbSearch,
+    applyDbMatch,
+    editorRows,
+    editorRowFromDb,
     buildRequestPayload,
     extractAiText,
     classifyUpstreamText,
