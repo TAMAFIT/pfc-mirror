@@ -13,7 +13,10 @@ const missingCanonical = official.filter(item => !item.canonicalId).map(item=>it
 const duplicateCanonicalIds = dup(official.map(item=>item.canonicalId));
 const lowConfidence = official.filter(item => item.confidence !== 'high').map(item=>item.name);
 const restaurantBadNamespace = restaurant.filter(item => !/^restaurant:mcd-jp:[a-z0-9-]+$/.test(String(item.canonicalId||''))).map(item=>item.name);
-const restaurantMissingUrl = restaurant.filter(item => !/^https:\/\/www\.mcdonalds\.co\.jp\/products\//.test(String(item.source?.url||''))).map(item=>item.name);
+const restaurantMissingUrl = restaurant.filter(item => {
+  const url=String(item.source?.url||'');
+  return !/^https:\/\/www\.mcdonalds\.co\.jp\/(?:products\/|en\/quality\/allergy_Nutrition\/nutrient\/)/.test(url);
+}).map(item=>item.name);
 const restaurantMissingProvider = restaurant.filter(item => item.source?.provider !== "McDonald's Japan").map(item=>item.name);
 const restaurantMissingServing = restaurant.filter(item => !item.source?.servingNutrition || item.source?.servingNutrition?.kcal == null).map(item=>item.name);
 const report = {
@@ -37,9 +40,9 @@ const report = {
   markers: master.markers
 };
 fs.writeFileSync(output,JSON.stringify(report,null,2)+'\n');
-assert.equal(mext.length,46,'MEXT official coverage must remain 46 in D6');
-assert.equal(restaurant.length,11,'D6 must expose 11 McDonald’s official records');
-assert.equal(official.length,57,'D6 total official-backed foods must be 57');
+assert.equal(mext.length,46,'MEXT official coverage must remain 46 in D7');
+assert.equal(restaurant.length,11,'D7 must expose 11 McDonald’s official records');
+assert.equal(official.length,57,'D7 total official-backed foods must be 57');
 for (const [label,list] of Object.entries({missingCanonical,duplicateCanonicalIds,lowConfidence,restaurantBadNamespace,restaurantMissingUrl,restaurantMissingProvider,restaurantMissingServing})) {
   assert.deepEqual(list,[],`${label} must be empty`);
 }

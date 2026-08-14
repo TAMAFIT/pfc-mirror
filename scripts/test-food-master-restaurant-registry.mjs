@@ -12,8 +12,8 @@ const expected = {
   'チーズバーガー': [15.9,13.5,31.0,310],
   'ダブルチーズ': [26.4,25.1,31.8,459],
   'ビッグマック': [26.1,28.0,42.0,524],
-  'フィレオフィッシュ': [15.0,14.2,37.4,338],
-  'チキチー': [16.4,23.2,40.3,433],
+  'フィレオフィッシュ': [15.1,14.2,37.4,338],
+  'チキチー': [16.4,23.6,40.3,436],
   'エグチ': [22.4,19.0,31.2,390],
   'ポテト(S)': [2.8,10.7,28.5,221],
   'ポテト(M)': [5.3,19.7,51.8,404],
@@ -21,8 +21,7 @@ const expected = {
   'ナゲット(5個)': [15.3,16.1,13.3,262]
 };
 const DB = Object.entries(expected).map(([name,vals]) => [
-  name.startsWith('ポテト') || name.startsWith('ナゲット') ? '🍔ジャンク・菓子' : '🍔ジャンク・菓子',
-  name, name, name === 'ナゲット(5個)' ? '1箱' : '1個', 1,1,1,1
+  '🍔ジャンク・菓子', name, name, name === 'ナゲット(5個)' ? '1箱' : '1個', 1,1,1,1
 ]);
 const store = new Map();
 const favoriteSettings = {};
@@ -38,7 +37,7 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync(registryPath,'utf8'),context,{filename:registryPath});
 const registry=context.__PFC_FOOD_MASTER_RESTAURANT_REGISTRY__;
 assert.ok(registry);
-assert.equal(registry.version,'6.0.0');
+assert.equal(registry.version,'7.0.0');
 assert.equal(registry.provider,"McDonald's Japan");
 assert.equal(registry.count,11);
 assert.equal(registry.applied.length,11);
@@ -53,7 +52,7 @@ for (const [name,vals] of Object.entries(expected)) {
   assert.equal(hint.source.provider,"McDonald's Japan");
   assert.equal(hint.confidence,'high');
   assert.ok(hint.canonicalId.startsWith('restaurant:mcd-jp:'));
-  assert.match(hint.source.url,/^https:\/\/www\.mcdonalds\.co\.jp\/products\//);
+  assert.match(hint.source.url,/^https:\/\/www\.mcdonalds\.co\.jp\/(?:products\/|en\/quality\/allergy_Nutrition\/nutrient\/)/);
 }
 
 vm.runInContext(fs.readFileSync(corePath,'utf8'),context,{filename:corePath});
