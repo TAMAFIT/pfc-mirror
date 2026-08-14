@@ -35,18 +35,22 @@ if (!html.includes('pfc-food-master-runtime.js')) {
 }
 fs.writeFileSync(htmlPath, html, 'utf8');
 
-// Only the useful photo path remains. Barcode/Open Food Facts and local OCR are intentionally removed.
+// V3.8 remains the conservative transport/base layer. V4 replaces the review flow with provisional editable cards.
 const dishApply = path.join(root, 'scripts', 'apply-dish-photo-v30.mjs');
-if (!fs.existsSync(dishApply)) throw new Error('Dish photo v3.0 build script missing');
+if (!fs.existsSync(dishApply)) throw new Error('Dish photo v3.8 build script missing');
 const dishResult = spawnSync(process.execPath, [dishApply], { stdio: 'inherit' });
-if (dishResult.status !== 0) throw new Error('Dish photo v3.0 build step failed');
+if (dishResult.status !== 0) throw new Error('Dish photo v3.8 build step failed');
+const dishV40Apply = path.join(root, 'scripts', 'apply-dish-photo-v40.mjs');
+if (!fs.existsSync(dishV40Apply)) throw new Error('Dish photo v4 build script missing');
+const dishV40Result = spawnSync(process.execPath, [dishV40Apply], { stdio: 'inherit' });
+if (dishV40Result.status !== 0) throw new Error('Dish photo v4 build step failed');
 html = fs.readFileSync(htmlPath, 'utf8');
 
 const scriptUrl = file => {
   const pattern = new RegExp(`<script[^>]+src=["']([^"']*${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"']*)["']`, 'i');
   return html.match(pattern)?.[1] || file;
 };
-const assetFiles = [...dataFiles, 'pfc-food-master-runtime.js', 'pfc-dish-photo-v30.js', 'pfc-dish-photo-v30.css'];
+const assetFiles = [...dataFiles, 'pfc-food-master-runtime.js', 'pfc-dish-photo-v30.js', 'pfc-dish-photo-v30.css', 'pfc-dish-photo-v40.js', 'pfc-dish-photo-v40.css'];
 const assets = assetFiles.map(file => ({ url: scriptUrl(file), sha256: hash(fs.readFileSync(path.join(dist, file))) }));
 assets.push({ url: 'index.html', sha256: hash(fs.readFileSync(htmlPath)) });
 const manifest = { schemaVersion: 2, fingerprint, generatedAt: new Date().toISOString(), strategy: 'local-first-next-launch', officialProviderAssets: ['pfc-food-master-mext-registry.js', 'pfc-food-master-restaurant-registry.js'], assets };
@@ -60,10 +64,12 @@ const searchPos = finalHtml.indexOf('pfc-database-v3-search.js');
 const runtimePos = finalHtml.indexOf('pfc-food-master-runtime.js');
 const inputPos = finalHtml.indexOf('pfc-input-v25.js');
 const dishPos = finalHtml.indexOf('pfc-dish-photo-v30.js');
-if (!(mextPos >= 0 && restaurantPos > mextPos && corePos > restaurantPos && searchPos > corePos && runtimePos > searchPos && inputPos > runtimePos && dishPos > inputPos)) throw new Error('Food Master runtime/dish photo script order is invalid.');
+const dishV40Pos = finalHtml.indexOf('pfc-dish-photo-v40.js');
+if (!(mextPos >= 0 && restaurantPos > mextPos && corePos > restaurantPos && searchPos > corePos && runtimePos > searchPos && inputPos > runtimePos && dishPos > inputPos && dishV40Pos > dishPos)) throw new Error('Food Master runtime/dish photo script order is invalid.');
 if (!finalHtml.includes('pfc-food-master-runtime.js?v=100')) throw new Error('Food Master runtime cache version is stale.');
-if (!finalHtml.includes('pfc-dish-photo-v30.js?v=') || !finalHtml.includes('pfc-dish-photo-v30.css?v=')) throw new Error('Dish photo v3.0 final assets missing');
+if (!finalHtml.includes('pfc-dish-photo-v30.js?v=') || !finalHtml.includes('pfc-dish-photo-v30.css?v=')) throw new Error('Dish photo v3.8 base assets missing');
+if (!finalHtml.includes('pfc-dish-photo-v40.js?v=') || !finalHtml.includes('pfc-dish-photo-v40.css?v=')) throw new Error('Dish photo v4 final assets missing');
 for (const obsolete of ['pfc-scan-v28.js','pfc-scan-v28.css','pfc-dish-photo-v29.js','pfc-dish-photo-v29.css','pfc-dish-photo-v29-bootstrap.js']) if (finalHtml.includes(obsolete)) throw new Error(`obsolete scan asset leaked into final HTML: ${obsolete}`);
 if (!runtimeBuilt.includes(`const BUILD_FINGERPRINT = '${fingerprint}'`)) throw new Error('Food Master runtime fingerprint injection failed.');
 
-console.log(`Food Master runtime ready: ${fingerprint}`);
+console.log(`Food Master runtime ready with dish photo v4: ${fingerprint}`);
