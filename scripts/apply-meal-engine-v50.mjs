@@ -7,32 +7,38 @@ const root = process.cwd();
 const dist = path.join(root,'dist');
 const engineSource = path.join(root,'overrides','pfc-meal-engine-v50.js');
 const editorSource = path.join(root,'overrides','pfc-meal-editor-v50.js');
+const hardeningSource = path.join(root,'overrides','pfc-meal-v501-hardening.js');
 const cssSource = path.join(root,'overrides','pfc-meal-editor-v50.css');
 const engineOut = path.join(dist,'pfc-meal-engine-v50.js');
 const editorOut = path.join(dist,'pfc-meal-editor-v50.js');
+const hardeningOut = path.join(dist,'pfc-meal-v501-hardening.js');
 const cssOut = path.join(dist,'pfc-meal-editor-v50.css');
 const htmlPath = path.join(dist,'index.html');
 const aiPath = path.join(dist,'ai.js');
-for (const file of [engineSource,editorSource,cssSource,htmlPath,aiPath]) if (!fs.existsSync(file)) throw new Error(`Meal Engine v5 dependency missing: ${file}`);
+for (const file of [engineSource,editorSource,hardeningSource,cssSource,htmlPath,aiPath]) if (!fs.existsSync(file)) throw new Error(`Meal Engine v5 dependency missing: ${file}`);
 
 const engine = fs.readFileSync(engineSource,'utf8');
 const editor = fs.readFileSync(editorSource,'utf8');
+const hardening = fs.readFileSync(hardeningSource,'utf8');
 const css = fs.readFileSync(cssSource);
 const test = spawnSync(process.execPath,[path.join(root,'scripts','test-meal-engine-v50.mjs'),engineSource,editorSource,cssSource],{stdio:'inherit'});
 if (test.status !== 0) throw new Error('Meal Engine v5 tests failed');
+for (const marker of ["VERSION = '5.0.1'",'inEditorVoice:true','footerRecovery:true','singleLayerPreserved:true']) if (!hardening.includes(marker)) throw new Error(`Meal v5.0.1 hardening marker missing: ${marker}`);
 
 const hash = content => createHash('sha256').update(content).digest('hex').slice(0,12);
 const engineHash = hash(engine);
 const editorHash = hash(editor);
+const hardeningHash = hash(hardening);
 const cssHash = hash(css);
 fs.writeFileSync(engineOut,engine,'utf8');
 fs.writeFileSync(editorOut,editor,'utf8');
+fs.writeFileSync(hardeningOut,hardening,'utf8');
 fs.writeFileSync(cssOut,css);
 
 let html = fs.readFileSync(htmlPath,'utf8');
 if (!html.includes('pfc-dish-photo-v40.js')) throw new Error('Dish photo v4 base must load before Meal Engine v5');
 if (!html.includes('pfc-meal-editor-v50.css')) html = html.replace('</head>',`    <link rel="stylesheet" href="pfc-meal-editor-v50.css?v=${cssHash}">\n</head>`);
-if (!html.includes('pfc-meal-engine-v50.js')) html = html.replace('</body>',`    <script src="pfc-meal-engine-v50.js?v=${engineHash}"></script>\n    <script src="pfc-meal-editor-v50.js?v=${editorHash}"></script>\n</body>`);
+if (!html.includes('pfc-meal-engine-v50.js')) html = html.replace('</body>',`    <script src="pfc-meal-engine-v50.js?v=${engineHash}"></script>\n    <script src="pfc-meal-editor-v50.js?v=${editorHash}"></script>\n    <script src="pfc-meal-v501-hardening.js?v=${hardeningHash}"></script>\n</body>`);
 fs.writeFileSync(htmlPath,html,'utf8');
 
 let ai = fs.readFileSync(aiPath,'utf8');
@@ -46,10 +52,12 @@ const finalAi = fs.readFileSync(aiPath,'utf8');
 const dishPos = finalHtml.indexOf('pfc-dish-photo-v40.js');
 const enginePos = finalHtml.indexOf('pfc-meal-engine-v50.js');
 const editorPos = finalHtml.indexOf('pfc-meal-editor-v50.js');
-if (!(dishPos >= 0 && enginePos > dishPos && editorPos > enginePos)) throw new Error('Meal Engine v5 script ordering is invalid');
+const hardeningPos = finalHtml.indexOf('pfc-meal-v501-hardening.js');
+if (!(dishPos >= 0 && enginePos > dishPos && editorPos > enginePos && hardeningPos > editorPos)) throw new Error('Meal Engine v5 script ordering is invalid');
 for (const marker of [
   `pfc-meal-engine-v50.js?v=${engineHash}`,
   `pfc-meal-editor-v50.js?v=${editorHash}`,
+  `pfc-meal-v501-hardening.js?v=${hardeningHash}`,
   `pfc-meal-editor-v50.css?v=${cssHash}`
 ]) if (!finalHtml.includes(marker)) throw new Error(`Meal Engine v5 cache-busted asset missing: ${marker}`);
 if (finalAi.includes('たまちゃん考え中')) throw new Error('Legacy Tama thinking label remains in ai.js');
@@ -57,4 +65,4 @@ if (!finalAi.includes('大林トレーナーAIが回答中')) throw new Error('T
 for (const marker of ['legacyCommandTags:false','transactionalMutations:true','nonAlcoholAZeroGuard:true']) if (!engine.includes(marker)) throw new Error(`Meal Engine v5 marker missing: ${marker}`);
 for (const marker of ['singleLayerEditor:true','directNameEditing:true','inlineDbSearch:true','voiceDraftEditing:true']) if (!editor.includes(marker)) throw new Error(`Meal Editor v5 marker missing: ${marker}`);
 
-console.log(`Meal Engine v5 applied (${engineHash}/${editorHash}/${cssHash}).`);
+console.log(`Meal Engine v5.0.1 applied (${engineHash}/${editorHash}/${hardeningHash}/${cssHash}).`);
