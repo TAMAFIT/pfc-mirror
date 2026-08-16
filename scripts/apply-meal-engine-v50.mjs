@@ -18,7 +18,10 @@ const aiPath = path.join(dist,'ai.js');
 for (const file of [engineSource,editorSource,hardeningSource,cssSource,htmlPath,aiPath]) if (!fs.existsSync(file)) throw new Error(`Meal Engine v5 dependency missing: ${file}`);
 
 const engine = fs.readFileSync(engineSource,'utf8');
-const editor = fs.readFileSync(editorSource,'utf8');
+const editorRaw = fs.readFileSync(editorSource,'utf8');
+const rootClassBug = "    document.documentElement.classList.add('pfc-meal-editor-v50');\n";
+const editor = editorRaw.replace(rootClassBug,'');
+if (editor === editorRaw || editor.includes("document.documentElement.classList.add('pfc-meal-editor-v50')")) throw new Error('Meal Editor v5 root-class white-screen guard failed');
 const hardening = fs.readFileSync(hardeningSource,'utf8');
 const css = fs.readFileSync(cssSource);
 const test = spawnSync(process.execPath,[path.join(root,'scripts','test-meal-engine-v50.mjs'),engineSource,editorSource,cssSource],{stdio:'inherit'});
@@ -49,6 +52,7 @@ fs.writeFileSync(aiPath,ai,'utf8');
 
 const finalHtml = fs.readFileSync(htmlPath,'utf8');
 const finalAi = fs.readFileSync(aiPath,'utf8');
+const finalEditor = fs.readFileSync(editorOut,'utf8');
 const dishPos = finalHtml.indexOf('pfc-dish-photo-v40.js');
 const enginePos = finalHtml.indexOf('pfc-meal-engine-v50.js');
 const editorPos = finalHtml.indexOf('pfc-meal-editor-v50.js');
@@ -60,9 +64,10 @@ for (const marker of [
   `pfc-meal-v501-hardening.js?v=${hardeningHash}`,
   `pfc-meal-editor-v50.css?v=${cssHash}`
 ]) if (!finalHtml.includes(marker)) throw new Error(`Meal Engine v5 cache-busted asset missing: ${marker}`);
+if (finalEditor.includes("document.documentElement.classList.add('pfc-meal-editor-v50')")) throw new Error('Published Meal Editor would hide the document root');
 if (finalAi.includes('たまちゃん考え中')) throw new Error('Legacy Tama thinking label remains in ai.js');
 if (!finalAi.includes('大林トレーナーAIが回答中')) throw new Error('Trainer thinking label was not applied');
 for (const marker of ['legacyCommandTags:false','transactionalMutations:true','nonAlcoholAZeroGuard:true']) if (!engine.includes(marker)) throw new Error(`Meal Engine v5 marker missing: ${marker}`);
 for (const marker of ['singleLayerEditor:true','directNameEditing:true','inlineDbSearch:true','voiceDraftEditing:true']) if (!editor.includes(marker)) throw new Error(`Meal Editor v5 marker missing: ${marker}`);
 
-console.log(`Meal Engine v5.0.1 applied (${engineHash}/${editorHash}/${hardeningHash}/${cssHash}).`);
+console.log(`Meal Engine v5.0.2 applied with root-display guard (${engineHash}/${editorHash}/${hardeningHash}/${cssHash}).`);
