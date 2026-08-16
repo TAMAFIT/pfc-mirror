@@ -2,6 +2,7 @@
 (() => {
   'use strict';
   const VERSION = '5.0.1';
+  let editorRecognition = null;
 
   function ensureStyle() {
     if (document.getElementById('pfc-meal-v501-style')) return;
@@ -9,6 +10,53 @@
     style.id = 'pfc-meal-v501-style';
     style.textContent = `.v50-footer-actions{display:grid;grid-template-columns:minmax(0,.42fr) minmax(0,1fr);gap:8px}.v50-voice-edit{border:1px solid #bfe0d1;border-radius:14px;background:#eef9f4;color:#167653;font-size:13px;font-weight:900;padding:13px 8px}.v50-voice-edit.is-listening{background:#dcf5e9;box-shadow:0 0 0 3px rgba(34,160,107,.12)}@media(max-width:360px){.v50-footer-actions{grid-template-columns:1fr}.v50-voice-edit{padding:10px}}`;
     document.head.appendChild(style);
+  }
+
+  function submitTranscript(text) {
+    const input = document.getElementById('v-chat-input');
+    const transcript = String(text || '').trim();
+    if (!transcript || !input || typeof window.sendVoiceChat !== 'function') return false;
+    input.value = transcript;
+    input.disabled = false;
+    window.sendVoiceChat();
+    return true;
+  }
+
+  function startEditorVoice(voice, status) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      if (status) status.textContent = 'このブラウザは音声入力に対応していません。';
+      return;
+    }
+    try { editorRecognition?.abort?.(); } catch {}
+    const recognition = new SpeechRecognition();
+    editorRecognition = recognition;
+    recognition.lang = 'ja-JP';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    try { recognition.maxAlternatives = 3; } catch {}
+    recognition.onstart = () => {
+      voice.classList.add('is-listening');
+      if (status) status.textContent = '話してください。例:「唐揚げを100gにして」「キャベツ消して」';
+    };
+    recognition.onresult = event => {
+      const result = event?.results?.[0];
+      const transcript = result?.[0]?.transcript || '';
+      if (status) status.textContent = transcript ? `認識: ${transcript}` : '音声を認識できませんでした。';
+      submitTranscript(transcript);
+    };
+    recognition.onerror = event => {
+      if (status) status.textContent = event?.error === 'not-allowed' ? 'マイクの使用を許可してください。' : '音声入力に失敗しました。もう一度試してください。';
+    };
+    recognition.onend = () => {
+      voice.classList.remove('is-listening');
+      editorRecognition = null;
+    };
+    try { recognition.start(); }
+    catch {
+      voice.classList.remove('is-listening');
+      if (status) status.textContent = '音声入力を開始できませんでした。';
+    }
   }
 
   function ensureVoiceButton() {
@@ -33,14 +81,11 @@
         if (status) status.textContent = '食品カードを開いてから音声修正を使ってください。';
         return;
       }
-      if (typeof window.toggleVoiceMic !== 'function') {
-        if (status) status.textContent = 'このブラウザでは音声入力を開始できません。';
+      if (editorRecognition) {
+        try { editorRecognition.stop(); } catch {}
         return;
       }
-      voice.classList.add('is-listening');
-      if (status) status.textContent = '話してください。例:「唐揚げを100gにして」「キャベツ消して」';
-      window.toggleVoiceMic();
-      setTimeout(() => voice.classList.remove('is-listening'), 3500);
+      startEditorVoice(voice, status);
     };
     return true;
   }
@@ -77,7 +122,7 @@
       const observer = new MutationObserver(() => { recoverFooterForDraft(); ensureVoiceButton(); });
       observer.observe(host,{attributes:true,subtree:true,childList:true,attributeFilter:['class','style']});
     }
-    window.__PFC_MEAL_V501__ = { version:VERSION, inEditorVoice:true, footerRecovery:true, singleLayerPreserved:true };
+    window.__PFC_MEAL_V501__ = { version:VERSION, inEditorVoice:true, editorVoiceIndependentAutoSend:true, footerRecovery:true, singleLayerPreserved:true };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',install,{once:true});
