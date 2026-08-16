@@ -26,7 +26,22 @@ const hardening = fs.readFileSync(hardeningSource,'utf8');
 const css = fs.readFileSync(cssSource);
 const test = spawnSync(process.execPath,[path.join(root,'scripts','test-meal-engine-v50.mjs'),engineSource,editorSource,cssSource],{stdio:'inherit'});
 if (test.status !== 0) throw new Error('Meal Engine v5 tests failed');
-for (const marker of ["VERSION = '5.0.1'",'inEditorVoice:true','footerRecovery:true','singleLayerPreserved:true']) if (!hardening.includes(marker)) throw new Error(`Meal v5.0.1 hardening marker missing: ${marker}`);
+const voiceTest = spawnSync(process.execPath,[path.join(root,'scripts','test-voice-v51.mjs'),hardeningSource],{stdio:'inherit'});
+if (voiceTest.status !== 0) throw new Error('Voice Intelligence v5.1 tests failed');
+const hardeningSyntax = spawnSync(process.execPath,['--check',hardeningSource],{stdio:'inherit'});
+if (hardeningSyntax.status !== 0) throw new Error('Voice Intelligence v5.1 syntax check failed');
+for (const marker of [
+  "VERSION = '5.0.1'",
+  "VOICE_INTELLIGENCE_VERSION = '5.1.0'",
+  "VOICE_MODEL = 'gemini-3.5-flash-lite'",
+  'inEditorVoice:true',
+  'footerRecovery:true',
+  'singleLayerPreserved:true',
+  'genericConfirmationMemory:true',
+  'recordNutritionContext:true',
+  'foodMasterRepair:true',
+  'localRepairFastPath:true'
+]) if (!hardening.includes(marker)) throw new Error(`Meal/Voice hardening marker missing: ${marker}`);
 
 const hash = content => createHash('sha256').update(content).digest('hex').slice(0,12);
 const engineHash = hash(engine);
@@ -70,4 +85,4 @@ if (!finalAi.includes('大林トレーナーAIが回答中')) throw new Error('T
 for (const marker of ['legacyCommandTags:false','transactionalMutations:true','nonAlcoholAZeroGuard:true']) if (!engine.includes(marker)) throw new Error(`Meal Engine v5 marker missing: ${marker}`);
 for (const marker of ['singleLayerEditor:true','directNameEditing:true','inlineDbSearch:true','voiceDraftEditing:true']) if (!editor.includes(marker)) throw new Error(`Meal Editor v5 marker missing: ${marker}`);
 
-console.log(`Meal Engine v5.0.2 applied with root-display guard (${engineHash}/${editorHash}/${hardeningHash}/${cssHash}).`);
+console.log(`Meal Engine v5.0.2 + Voice Intelligence v5.1 applied (${engineHash}/${editorHash}/${hardeningHash}/${cssHash}).`);
