@@ -35,29 +35,25 @@ if (!html.includes('pfc-food-master-runtime.js')) {
 }
 fs.writeFileSync(htmlPath, html, 'utf8');
 
-// V3.8/V4 stay as the conservative Gemini photo transport. V5 owns all user-facing meal editing and voice mutations.
+// V3.8 remains the conservative transport/base layer. V4 replaces the review flow with provisional editable cards.
 const dishApply = path.join(root, 'scripts', 'apply-dish-photo-v30.mjs');
 if (!fs.existsSync(dishApply)) throw new Error('Dish photo v3.8 build script missing');
-const dishResult = spawnSync(process.execPath, [dishApply], { stdio:'inherit' });
+const dishResult = spawnSync(process.execPath, [dishApply], { stdio: 'inherit' });
 if (dishResult.status !== 0) throw new Error('Dish photo v3.8 build step failed');
 const dishV40Apply = path.join(root, 'scripts', 'apply-dish-photo-v40.mjs');
 if (!fs.existsSync(dishV40Apply)) throw new Error('Dish photo v4 build script missing');
-const dishV40Result = spawnSync(process.execPath, [dishV40Apply], { stdio:'inherit' });
+const dishV40Result = spawnSync(process.execPath, [dishV40Apply], { stdio: 'inherit' });
 if (dishV40Result.status !== 0) throw new Error('Dish photo v4 build step failed');
-const mealV50Apply = path.join(root, 'scripts', 'apply-meal-engine-v50.mjs');
-if (!fs.existsSync(mealV50Apply)) throw new Error('Meal Engine v5 build script missing');
-const mealV50Result = spawnSync(process.execPath, [mealV50Apply], { stdio:'inherit' });
-if (mealV50Result.status !== 0) throw new Error('Meal Engine v5 build step failed');
 html = fs.readFileSync(htmlPath, 'utf8');
 
 const scriptUrl = file => {
   const pattern = new RegExp(`<script[^>]+src=["']([^"']*${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"']*)["']`, 'i');
   return html.match(pattern)?.[1] || file;
 };
-const assetFiles = [...dataFiles, 'pfc-food-master-runtime.js', 'pfc-dish-photo-v30.js', 'pfc-dish-photo-v30.css', 'pfc-dish-photo-v40.js', 'pfc-dish-photo-v40.css', 'pfc-meal-engine-v50.js', 'pfc-meal-editor-v50.js', 'pfc-meal-v501-hardening.js', 'pfc-meal-editor-v50.css'];
+const assetFiles = [...dataFiles, 'pfc-food-master-runtime.js', 'pfc-dish-photo-v30.js', 'pfc-dish-photo-v30.css', 'pfc-dish-photo-v40.js', 'pfc-dish-photo-v40.css'];
 const assets = assetFiles.map(file => ({ url: scriptUrl(file), sha256: hash(fs.readFileSync(path.join(dist, file))) }));
-assets.push({ url:'index.html', sha256:hash(fs.readFileSync(htmlPath)) });
-const manifest = { schemaVersion:2, fingerprint, generatedAt:new Date().toISOString(), strategy:'local-first-next-launch', officialProviderAssets:['pfc-food-master-mext-registry.js','pfc-food-master-restaurant-registry.js'], assets };
+assets.push({ url: 'index.html', sha256: hash(fs.readFileSync(htmlPath)) });
+const manifest = { schemaVersion: 2, fingerprint, generatedAt: new Date().toISOString(), strategy: 'local-first-next-launch', officialProviderAssets: ['pfc-food-master-mext-registry.js', 'pfc-food-master-restaurant-registry.js'], assets };
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
 const finalHtml = fs.readFileSync(htmlPath, 'utf8');
@@ -69,15 +65,11 @@ const runtimePos = finalHtml.indexOf('pfc-food-master-runtime.js');
 const inputPos = finalHtml.indexOf('pfc-input-v25.js');
 const dishPos = finalHtml.indexOf('pfc-dish-photo-v30.js');
 const dishV40Pos = finalHtml.indexOf('pfc-dish-photo-v40.js');
-const mealEnginePos = finalHtml.indexOf('pfc-meal-engine-v50.js');
-const mealEditorPos = finalHtml.indexOf('pfc-meal-editor-v50.js');
-const mealHardeningPos = finalHtml.indexOf('pfc-meal-v501-hardening.js');
-if (!(mextPos >= 0 && restaurantPos > mextPos && corePos > restaurantPos && searchPos > corePos && runtimePos > searchPos && inputPos > runtimePos && dishPos > inputPos && dishV40Pos > dishPos && mealEnginePos > dishV40Pos && mealEditorPos > mealEnginePos && mealHardeningPos > mealEditorPos)) throw new Error('Food Master / Meal Engine script order is invalid.');
+if (!(mextPos >= 0 && restaurantPos > mextPos && corePos > restaurantPos && searchPos > corePos && runtimePos > searchPos && inputPos > runtimePos && dishPos > inputPos && dishV40Pos > dishPos)) throw new Error('Food Master runtime/dish photo script order is invalid.');
 if (!finalHtml.includes('pfc-food-master-runtime.js?v=100')) throw new Error('Food Master runtime cache version is stale.');
 if (!finalHtml.includes('pfc-dish-photo-v30.js?v=') || !finalHtml.includes('pfc-dish-photo-v30.css?v=')) throw new Error('Dish photo v3.8 base assets missing');
-if (!finalHtml.includes('pfc-dish-photo-v40.js?v=') || !finalHtml.includes('pfc-dish-photo-v40.css?v=')) throw new Error('Dish photo v4 base assets missing');
-if (!finalHtml.includes('pfc-meal-engine-v50.js?v=') || !finalHtml.includes('pfc-meal-editor-v50.js?v=') || !finalHtml.includes('pfc-meal-v501-hardening.js?v=') || !finalHtml.includes('pfc-meal-editor-v50.css?v=')) throw new Error('Meal Engine v5 assets missing');
+if (!finalHtml.includes('pfc-dish-photo-v40.js?v=') || !finalHtml.includes('pfc-dish-photo-v40.css?v=')) throw new Error('Dish photo v4 final assets missing');
 for (const obsolete of ['pfc-scan-v28.js','pfc-scan-v28.css','pfc-dish-photo-v29.js','pfc-dish-photo-v29.css','pfc-dish-photo-v29-bootstrap.js']) if (finalHtml.includes(obsolete)) throw new Error(`obsolete scan asset leaked into final HTML: ${obsolete}`);
-if (!runtimeBuilt.includes(`const BUILD_FINGERPRINT = '${fingerprint}'`)) throw new Error('Food Master build fingerprint injection failed.');
+if (!runtimeBuilt.includes(`const BUILD_FINGERPRINT = '${fingerprint}'`)) throw new Error('Food Master runtime fingerprint injection failed.');
 
-console.log(`Food Master runtime + unified Meal Engine v5.0.1 ready: ${fingerprint}`);
+console.log(`Food Master runtime ready with dish photo v4: ${fingerprint}`);
