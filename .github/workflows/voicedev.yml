@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 jobs:
   validate:
@@ -162,6 +164,99 @@ jobs:
           grep -q '.btn-voice-main' dist/pfc-v21.css
           grep -q '#voice-ui-window' dist/pfc-v21.css
           ! grep -q '🥚 たまちゃんコーチ' dist/index.html
+
+  managed_repo_evidence:
+    needs: validate
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record bounded VoiceDev managed-repo evidence
+        id: evidence
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          SOURCE_CI_RESULT: ${{ needs.validate.result }}
+        with:
+          script: |
+            const crypto = require('crypto');
+            const fs = require('fs');
+            const path = require('path');
+            const allowed = new Set(['success', 'failure', 'cancelled', 'skipped']);
+            const observation = value => {
+              const outcome = String(value || '').trim().toLowerCase();
+              return allowed.has(outcome)
+                ? { observation: 'OBSERVED', outcome }
+                : { observation: 'UNOBSERVED', outcome: null };
+            };
+            const pr = context.payload.pull_request;
+            if (!pr) throw new Error('pull_request payload is required');
+            const { owner, repo } = context.repo;
+            const changed = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: pr.number,
+              per_page: 100
+            });
+            const files = [...new Set(changed
+              .map(item => String(item.filename || '').trim().replaceAll('\\', '/'))
+              .filter(Boolean))].slice(0, 500);
+            const lineDelta = changed.reduce((sum, item) => sum + Number(item.additions || 0) + Number(item.deletions || 0), 0);
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner,
+              repo,
+              run_id: Number(process.env.GITHUB_RUN_ID),
+              per_page: 100
+            });
+            const sourceJob = jobs.find(job => job.name === 'validate');
+            if (!sourceJob) throw new Error('validate job not found in current workflow run');
+            const steps = (sourceJob.steps || []).slice(0, 24).map(step => ({
+              name: String(step.name || '').trim().slice(0, 80),
+              ...observation(step.conclusion)
+            })).filter(step => step.name);
+            const body = {
+              version: 1,
+              kind: 'voicedev-managed-repo-evidence-envelope',
+              authoritative: false,
+              repository: `${owner}/${repo}`,
+              pullRequest: {
+                number: Number(pr.number),
+                baseSha: String(pr.base.sha || '').toLowerCase(),
+                headSha: String(pr.head.sha || '').toLowerCase(),
+                branch: String(pr.head.ref || '').trim() || null
+              },
+              run: {
+                id: Number(process.env.GITHUB_RUN_ID),
+                attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+                workflow: String(process.env.GITHUB_WORKFLOW || '').trim() || null,
+                job: 'validate',
+                result: observation(process.env.SOURCE_CI_RESULT)
+              },
+              change: { files, lineDelta },
+              fullCi: { steps },
+              authority: 'raw-managed-repo-evidence-only-no-classification-test-selection-ci-release-merge-provider-secret-deployment-or-control-authority'
+            };
+            const digest = crypto.createHash('sha256').update(JSON.stringify(body), 'utf8').digest('hex');
+            const envelope = { ...body, digest };
+            const outputPath = path.join(process.env.RUNNER_TEMP, 'voicedev-managed-repo-evidence.json');
+            fs.writeFileSync(outputPath, `${JSON.stringify(envelope, null, 2)}\n`, 'utf8');
+            await core.summary
+              .addHeading('VoiceDev managed-repo evidence')
+              .addRaw(`source run: ${body.run.id}\n`)
+              .addRaw(`source result: ${body.run.result.outcome || 'UNOBSERVED'}\n`)
+              .addRaw(`changed files: ${files.length}\n`)
+              .addRaw(`digest: ${digest}\n`)
+              .addRaw('Raw evidence only; canonical VoiceDev review is required before V3a/V4/V5a/V5b classification.\n')
+              .write();
+
+      - name: Upload bounded VoiceDev managed-repo evidence
+        if: ${{ always() && steps.evidence.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicedev-managed-repo-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/voicedev-managed-repo-evidence.json
+          if-no-files-found: ignore
+          retention-days: 30
 
   deploy:
     if: needs.validate.outputs.publish_ready == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
